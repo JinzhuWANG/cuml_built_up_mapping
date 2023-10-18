@@ -1,0 +1,1 @@
+SAMPLE_PROP = 0.001
