@@ -13,7 +13,7 @@ SAMPLE_PTS_PATH = '/mnt/d/sample_points'
 ############################################
 #           REGEION & NAME                 #
 ############################################
-REGION = 'xinan'
+REGION = 'xinan' # 'xibei,zhongnan,dongbei,huabei,huadong'
 YEAR_RANGE = '2020_2022'
 
 # the ShpFile to subset the input HDF data,

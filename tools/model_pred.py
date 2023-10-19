@@ -15,6 +15,10 @@ from tools import get_geo_meta
 
 # function to calculate the start/end row/col index with a shp file
 def subset_bounds(shp:str=SUBSET_PATH):
+    ''' get the start/end row/col index with a shp file
+    INPUT:  shp: path to the shp file
+    OUTPUT: (start_row, end_row), (start_col, end_col)
+    '''
     # get the transform
     geo_trans = get_geo_meta()['transform']
     # get the xy coordinates of the bounds of the shp
@@ -36,10 +40,10 @@ def subset_bounds(shp:str=SUBSET_PATH):
 
 def get_hdf_chunks(hdf_path,subset=SUBSET_PATH):
     ''' get the chunks from the hdf file
-    INPUT:  hdf_path: path to the hdf file
-    OUTPUT: hdf_arr_shape: shape of the hdf array,
-            chunk_dilate_size: the input array size to feed to the model,
-            chunks: list of tuples of chunk indices'''
+    INPUT:  hdf_path:           path to the hdf file
+    OUTPUT: hdf_arr_shape:      shape of the hdf array,
+            chunk_dilate_size:  the input array size to feed to the model,
+            chunks:             list of tuples of chunk indices'''
     # get the chunks
     with  h5py.File(hdf_path, 'r') as hdf_ds:
         hdf_arr = hdf_ds[list(hdf_ds.keys())[0]]
@@ -89,9 +93,9 @@ def get_hdf_chunks(hdf_path,subset=SUBSET_PATH):
 # loop through hdf files and make prediction on each chunk
 def pred_hdf(hdf_paths, model):
     ''' make prediction on the hdf file
-    INPUT: hdf_path: path to the hdf file
-           model: trained model
-    OUTPUT: pred: prediction array'''
+    INPUT:  hdf_path:    path to the hdf file
+            model:       trained model
+    OUTPUT: pred:        prediction array'''
 
     # get the array sizes and chunks
     hdf_arr_shape, chunk_dilate_size, chunks = get_hdf_chunks(list(hdf_paths)[0])
@@ -157,8 +161,9 @@ def pred_hdf(hdf_paths, model):
 
 def corespond_index(row_col_from):
     ''' get the coresponding index of the xy coordinates
-    INPUT: row_col_from: tuple of row/col index
-    geo_trans_to: geo_transformation of the target array'''
+    INPUT:  row_col_from:   tuple of row/col index from original coordinating system
+            geo_trans_to:   geo_transformation of the target array
+    OUTPUT: tuple of row/col index from the target coordinating system'''
 
 
     # get the geo_trans_from

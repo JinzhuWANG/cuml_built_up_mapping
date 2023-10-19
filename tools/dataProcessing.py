@@ -12,6 +12,11 @@ from tools import get_hdf_files, get_geo_meta, extract_val_to_pt
 
 
 def extract_img_val_to_sample():
+    ''' extract the image values to sample points
+    INPUT:  None, but read the sample points from {SAMPLE_PTS_PATH}
+    OUTPUT: None, but save the sample values to {SAMPLE_PTS_PATH}
+    '''
+    # check if the sample values already exist
     if os.path.exists(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy'):
         print('The sample values already exist!')
 
@@ -39,7 +44,7 @@ def extract_img_val_to_sample():
 
 def arr_to_TIFF():
     ''' save the array to tif file
-    INPUT: ds_arr: array with shape (C, H, W)
+    INPUT:  ds_arr: array with shape (C, H, W)
     OUTPUT: None, but export the tif file to the {TIF_SAVE_PATH}
     '''
     # open the HDF file, read the chunks

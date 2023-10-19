@@ -13,7 +13,7 @@ from PARAMETER import PATH_HDF, TIF_SAVE_PATH, \
 # get hdf input files
 def get_hdf_files():
     ''' get the hdf files from the PATH_HDF
-    INPUT: None
+    INPUT:  None
     OUTPUT: hdf_files: list of hdf files
     '''
     hdf_files = glob(f'{PATH_HDF}/{REGION}*.hdf')
@@ -25,9 +25,9 @@ def get_hdf_files():
 # get the value from hdf given row/col index
 def extract_val_to_pt(sample_pts,f):
     ''' extract the value from hdf given row/col index
-    INPUT: sample_pts: dataframe with columns ['row','col']
-           f: hdf file
-    OUTPUT: sample_values: array with shape (n_sample, C)
+    INPUT:  sample_pts:      dataframe with columns ['row','col']
+            f:               hdf file
+    OUTPUT: sample_values:   array with shape (n_sample, C)
     '''
     # read the hdf dataset
     ds = h5py.File(f, 'r')
@@ -49,6 +49,9 @@ def extract_val_to_pt(sample_pts,f):
 
 # function to get geo_transformation
 def get_geo_meta():
+    ''' get the geo_transformation from the tif_meta
+    INPUT:  None
+    OUTPUT: tif_meta: dictionary of geo_transformation'''
     # get the geo_transformation
     tif_meta = pd.read_pickle(f'{GEO_META_PATH}/tif_df.pkl')
     tif_meta = tif_meta[tif_meta['region'] == REGION]['trans'].values[0]
@@ -58,8 +61,8 @@ def get_geo_meta():
 
 def arr_to_TIFF(ds_arr):
     ''' save the array to tif file
-    INPUT: ds_arr: array with shape (C, H, W)
-    OUTPUT: None, but export the tif file to the {TIF_SAVE_PATH}
+    INPUT:  ds_arr: array with shape (C, H, W)
+    OUTPUT: None,   but export the tif file to the {TIF_SAVE_PATH}
     '''
     # open the HDF file, read the chunks
     hdf_classified =  h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}.hdf', 'r')

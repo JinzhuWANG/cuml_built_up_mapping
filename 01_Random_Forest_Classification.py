@@ -3,9 +3,10 @@ import geopandas as gpd
 
 from cuml.ensemble import RandomForestClassifier as cuRF
 from tools import get_hdf_files 
-from PARAMETER import SAMPLE_PTS_PATH, REGION, N_ESTIMATROS, MAX_DEPTH, SUBSET_PATH
 from tools.model_pred import pred_hdf
 from tools.dataProcessing import arr_to_TIFF, extract_img_val_to_sample
+
+from PARAMETER import SAMPLE_PTS_PATH, REGION, N_ESTIMATROS, MAX_DEPTH
 
 # get the hdf files
 hdf_files = get_hdf_files()
@@ -20,8 +21,7 @@ sample_y = gpd.read_file(f'{SAMPLE_PTS_PATH}/merge_pts_{REGION}.shp')['Built'].v
 
 # initiate the RF classifier
 model = cuRF( max_depth = MAX_DEPTH,
-              n_estimators = N_ESTIMATROS,
-              random_state  = 0 )
+              n_estimators = N_ESTIMATROS )
 
 trained_RF = model.fit( sample_X, sample_y )
 
