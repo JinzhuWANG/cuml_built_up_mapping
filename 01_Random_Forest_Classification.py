@@ -27,8 +27,10 @@ trained_RF = model.fit( sample_X, sample_y )
 
 
 # apply the model to the hdf files, and then save the prediction to a hdf
+print('Applying the model to the hdf files...')
 pred_hdf(hdf_files, trained_RF)
 
 # save classified hdf to tif
+print('Saving the classified hdf to tif...')
 arr_to_TIFF()
 

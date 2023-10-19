@@ -12,7 +12,7 @@ from tools import get_hdf_files, get_geo_meta, extract_val_to_pt
 
 
 def extract_img_val_to_sample():
-    if os.path.exist(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy'):
+    if os.path.exists(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy'):
         print('The sample values already exist!')
 
     else:
@@ -21,11 +21,6 @@ def extract_img_val_to_sample():
 
         # read the sample points
         sample_pts = gpd.read_file(f'{SAMPLE_PTS_PATH}/merge_pts_{REGION}.shp')
-
-
-        ##############################################################
-        #              Extract img values to sample points           #
-        ##############################################################
 
         # get the hdf files
         hdf_files = get_hdf_files()
