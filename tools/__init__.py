@@ -1,35 +1,85 @@
 import h5py
 import numpy as np
+import pandas as pd
+import rasterio
+from tqdm.auto import tqdm
+from glob import glob
+
 
 # import parameters
-from PARAMETER import SAMPLE_PROP
+from PARAMETER import PATH_HDF, TIF_SAVE_PATH, \
+                      GEO_META_PATH, REGION, YEAR_RANGE
 
-# read the hdf dataset, get the total chunks
-def sample_from_hdf(path):
-    ds = h5py.File(path, 'r')
-    ds_arr = ds[list(ds.keys())[0]]
+# get hdf input files
+def get_hdf_files():
+    ''' get the hdf files from the PATH_HDF
+    INPUT: None
+    OUTPUT: hdf_files: list of hdf files
+    '''
+    hdf_files = glob(f'{PATH_HDF}/{REGION}*.hdf')
+    hdf_files = [i for i in hdf_files if (('terrain' in i)|(YEAR_RANGE in i))]
 
-    # get the sample indices
-    chunks = [chunck for chunck in ds_arr.iter_chunks()]
+    return sorted(hdf_files)
 
-    # random choice of the sample indices from the total chunks
-    sample_indices = np.random.choice(len(chunks), 
-                                    int(len(chunks)*SAMPLE_PROP), 
-                                    replace=False)
-    sample_chunks = [chunks[i] for i in sample_indices]
 
-    # get the array from sample indices
-    sample_arrs = []
-    for chunk in sample_chunks:
-        arr = ds_arr[chunk]
-        if (arr.shape != ds_arr.chunks) or (arr.sum() == 0):
-            continue
-        else:
-            sample_arrs.append(arr)
+# get the value from hdf given row/col index
+def extract_val_to_pt(sample_pts,f):
+    ''' extract the value from hdf given row/col index
+    INPUT: sample_pts: dataframe with columns ['row','col']
+           f: hdf file
+    OUTPUT: sample_values: array with shape (n_sample, C)
+    '''
+    # read the hdf dataset
+    ds = h5py.File(f, 'r')
+    ds_name = list(ds.keys())[0]
+    ds_arr = ds[ds_name]
 
-    # concatenate the sample arrays, flatten the array, and close the dataset
-    sample_arr = np.array(sample_arrs) # (n_sample, C, H, W)
-    sample_arr = np.swapaxes(sample_arr, 1, 3).reshape(-1, sample_arr.shape[1])
+    # report the progress
+    print(f"Extracting values from {ds_name}...")
+
+    # get the sample values
+    sample_values = []
+    for row,col in tqdm(sample_pts[['row','col']].values):
+        sample_values.append(ds_arr[:,row,col])
+    
+    # close the dataset
     ds.close()
+    
+    return np.array(sample_values).astype(np.float32)
 
-    return sample_arr.astype(np.float32)
+# function to get geo_transformation
+def get_geo_meta():
+    # get the geo_transformation
+    tif_meta = pd.read_pickle(f'{GEO_META_PATH}/tif_df.pkl')
+    tif_meta = tif_meta[tif_meta['region'] == REGION]['trans'].values[0]
+    return tif_meta 
+
+# save hdf to tif
+
+def arr_to_TIFF(ds_arr):
+    ''' save the array to tif file
+    INPUT: ds_arr: array with shape (C, H, W)
+    OUTPUT: None, but export the tif file to the {TIF_SAVE_PATH}
+    '''
+    # open the HDF file, read the chunks
+    hdf_classified =  h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}.hdf', 'r')
+    hdf_chunks = [chunck for chunck in hdf_classified['classification'].iter_chunks()]
+
+    # get the geo_transformation
+    tif_meta = get_geo_meta()   
+    tif_meta.update({'count': 1, 
+                     'dtype': 'int8', 
+                     'driver': 'GTiff',
+                     'compress': 'lzw'})
+
+    # write the array to tif, chunk by chunk
+    with rasterio.open(f'{TIF_SAVE_PATH}/classification_{REGION}.tif', 
+                       'w',
+                       **tif_meta) as dst:
+        for chunk in tqdm(hdf_chunks):
+            arr = hdf_classified['pred'][chunk].astype(np.int8)
+            dst.write(arr, window=rasterio.windows.Window(chunk[1], chunk[0], arr.shape[1], arr.shape[0]))
+
+
+    # close the hdf file
+    hdf_classified.close()
