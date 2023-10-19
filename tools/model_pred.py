@@ -80,7 +80,9 @@ def get_hdf_chunks(hdf_path,subset=SUBSET_PATH):
 
         chunks = list(product(chunk_split_row, chunk_split_col))
 
-    return (hdf_arr_shape[0],(end_row-start_row),(end_col-start_col)), chunk_dilate_size, chunks
+    return ((hdf_arr_shape[0],(end_row-start_row),(end_col-start_col)), 
+            chunk_dilate_size, 
+            chunks)
 
 
 
@@ -124,14 +126,15 @@ def pred_hdf(hdf_paths, model):
             arr_slice_shape = arr_slice.shape
             
             # reshape the array into (H*W, C)
-            arr_slice = np.swapaxes(arr_slice, 0, 2).reshape(-1,arr_slice.shape[0]) # (H*W, C)
+            arr_slice = np.moveaxis(arr_slice, 0, -1) # (H, W, C)
+            arr_slice = arr_slice.reshape(-1, arr_slice.shape[-1]) # (H*W, C)
             input_arr.append(arr_slice)
 
         # reshape the input array into correct shape
         input_arr = np.hstack(input_arr) # (n*H*W, C)
   
         # make prediction
-        pred = model.predict(input_arr.astype(np.float32)) # (-1, 1)
+        pred = model.predict(input_arr.astype(np.float32)) # (H*W, 1)
 
         # reshape pred into (H, W)
         pred = pred.reshape(arr_slice_shape[-2], arr_slice_shape[-1])

@@ -31,4 +31,4 @@ MAX_DEPTH = 10
 # the hdf file are stored as chunks of 128*128
 # if the chunk_dilate = 2, then the input array 
 # to Random Forest model will be 256*256
-CHUNK_DILATE = 4
+CHUNK_DILATE = 2
