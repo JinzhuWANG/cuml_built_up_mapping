@@ -171,6 +171,13 @@ def pred_hdf(models):
     # get the hdf files
     hdf_paths = get_hdf_files()
 
+    # remove previously saved classification files if SUBSET_PATH == 'None'
+    if not os.path.exists(f'{SUBSET_PATH}'):
+        print(f'Removing previously saved classification_{REGION} files...')
+        for path in glob(f'{TIF_SAVE_PATH}/classification_{REGION}*'):
+            os.remove(path)
+
+
     # loop through the models
     for nonurban_ratio, model in models.items():
         print(f'Perform classification using the model trained with {nonurban_ratio} non-urban built-points...')

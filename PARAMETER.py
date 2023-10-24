@@ -25,8 +25,8 @@ YEAR_RANGE = '2020_2022'
 # the ShpFile to subset the input HDF data,
 # so that we can get partial result fast
 
-SUBSET_PATH = f'{BASE_PATH}/subset_SHP/subset_shp_{REGION}.shp'        # Enable this line to subset the input data
-# SUBSET_PATH = 'None'                                                 # Enable this line to use the whole input data
+# SUBSET_PATH = f'{BASE_PATH}/subset_SHP/subset_shp_{REGION}.shp'        # Enable this line to subset the input data
+SUBSET_PATH = 'None'                                                 # Enable this line to use the whole input data
 
 ############################################
 #           MODEL PARAMETERS               #
@@ -34,6 +34,7 @@ SUBSET_PATH = f'{BASE_PATH}/subset_SHP/subset_shp_{REGION}.shp'        # Enable 
 N_ESTIMATROS = 25
 MAX_DEPTH = 10
 TRAIN_SAMPLE_RATIO = 0.8
+OVERLAY_THRESHOLD = 7
 
 # the hdf file are stored as chunks of 128*128
 # if the chunk_dilate = 2, then the input array 

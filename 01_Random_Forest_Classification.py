@@ -1,6 +1,7 @@
-from tools import get_hdf_files 
+from PARAMETER import REGION, SUBSET_PATH
 from tools.model_pred import get_models, pred_hdf
-from tools.dataProcessing import arr_to_TIFF, extract_img_val_to_sample
+from tools.dataProcessing import arr_to_TIFF, calculate_overlay_accuracy,\
+                                 extract_img_val_to_sample, overlay_classified_tif
 from tools.training_spliting import increase_nonurban_pts, train_test_split_sample
 
 
@@ -38,5 +39,15 @@ trained_models = get_models()
 pred_hdf(trained_models)
 
 # save classified hdf to tif
-print('Saving the classified hdf to tif...')
 arr_to_TIFF()
+
+
+
+############################################
+#        Ovelay classifications            #
+############################################
+
+# Overlay all the classified tif files (num=10) to one tif file
+# and finding the pixles with value > 5 as the "final urban built-up area"
+overlay_classified_tif()
+calculate_overlay_accuracy()
