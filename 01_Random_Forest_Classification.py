@@ -1,11 +1,7 @@
 from tools import get_hdf_files 
 from tools.model_pred import get_models, pred_hdf
 from tools.dataProcessing import arr_to_TIFF, extract_img_val_to_sample
-
 from tools.training_spliting import increase_nonurban_pts, train_test_split_sample
-
-
-
 
 
 ############################################
@@ -22,8 +18,6 @@ increase_nonurban_pts()
 
 
 
-
-
 ############################################
 #             Model training               #
 ############################################
@@ -33,8 +27,6 @@ increase_nonurban_pts()
 #       we will use 500 non-urban built-points to train the model
 
 trained_models = get_models()
-
-
 
 
 
@@ -48,4 +40,3 @@ pred_hdf(trained_models)
 # save classified hdf to tif
 print('Saving the classified hdf to tif...')
 arr_to_TIFF()
-

@@ -20,6 +20,8 @@ from tools import get_geo_meta, get_hdf_files
 from PARAMETER import BASE_PATH, CHUNK_DILATE, MAX_DEPTH, N_ESTIMATROS, SAMPLE_PTS_PATH,\
                       TIF_SAVE_PATH, REGION, SUBSET_PATH
 
+import warnings
+warnings.filterwarnings("ignore")
 
 def get_models():
     ''' get the trained models
@@ -29,7 +31,7 @@ def get_models():
     sample_paths = glob(f'{SAMPLE_PTS_PATH}/sample_pts_{REGION}*.csv')
 
     print(f'Training the models using sample_pts_{REGION}_X.csv ...')
-    print('The accuracy report will be saved to {BASE_PATH}/accuracy_{REGION}.csv ')
+    print(f'The accuracy report will be saved to {BASE_PATH}/accuracy_{REGION}.csv \n')
 
     # read the sample points, 
     #   sample_X is the image values (without the Built columns), 
@@ -38,7 +40,7 @@ def get_models():
     models = {}
 
     # loop through the sample paths
-    for path in tqdm(sample_paths):
+    for path in sample_paths:
         # get the built_nonurban ratio from path
         built_nonurban_ratio = path.split('_')[-1].split('.csv')[0]
 
@@ -67,7 +69,7 @@ def get_models():
         # formatting the accuracy
         accuracy = pd.DataFrame(accuracy).T.reset_index()
         accuracy.columns = ['Indicator','precision','recall','f1-score','Sample Size']
-        accuracy.insert(0, 'Non-Built ratio', built_nonurban_ratio)
+        accuracy.insert(0, 'Non-Urban ratio', built_nonurban_ratio)
 
         # append the accuracy to the list
         accuracies.append(accuracy)
@@ -170,7 +172,7 @@ def pred_hdf(models):
     hdf_paths = get_hdf_files()
 
     # loop through the models
-    for nonurban_ratio, model in tqdm(models.items(),total=len(models)):
+    for nonurban_ratio, model in models.items():
         print(f'Perform classification using the model trained with {nonurban_ratio} non-urban built-points...')
 
         # get the array sizes and chunks

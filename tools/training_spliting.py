@@ -50,7 +50,7 @@ def train_test_split_sample(train_sample_ratio=TRAIN_SAMPLE_RATIO, rand_state=0)
 
     # report the size of training and testing data
     print(f'The size of training data is {len(X_train)}')
-    print(f'The size of testing data is {len(X_test)}')
+    print(f'The size of testing data is {len(X_test)}\n')
 
 
 # function to split the built points into urban and non-urban
@@ -96,7 +96,8 @@ def increase_nonurban_pts():
         # merge the built_pts (urban and non-urban sample points) 
         #   and non_built_pts (randomly sampled to the same size of built_pts)
         sample_built = pd.concat([sample_built_urban, sample_built_nonurban_sub])
-        sample_non_built = sample_non_built.sample(min(len(sample_built),len(sample_non_built)),replace=False)
+        sample_non_built = sample_non_built.sample(min(len(sample_built),len(sample_non_built)),
+                                                   replace=False)
 
         sample_pts = pd.concat([sample_built,sample_non_built])\
                        .drop(columns=['OBJECTID','geometry','urban_mask','col','row'])
@@ -104,4 +105,7 @@ def increase_nonurban_pts():
 
         # save the sample points
         sample_pts.to_csv(f'{SAMPLE_PTS_PATH}/sample_pts_{REGION}_{np.round(ratio,1)}.csv', index=False)
+    
+    # report Done!
+    print('Sample preparation done!\n')
        

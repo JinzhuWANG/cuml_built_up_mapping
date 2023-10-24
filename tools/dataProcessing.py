@@ -21,11 +21,11 @@ def extract_img_val_to_sample():
     '''
     # check if the sample values already exist
     if os.path.exists(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy'):
-        print('The sample values already exist!')
+        print('The sample values already exist!\n')
 
     else:
 
-        print('Extracting image values to sample points...')
+        print('Extracting image values to sample points...\n')
 
         # read the sample points
         sample_pts = gpd.read_file(f'{SAMPLE_PTS_PATH}/merge_pts_{REGION}.shp')
