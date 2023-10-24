@@ -3,30 +3,36 @@
 ############################################
 #               Data PATH                  #
 ############################################
-PATH_HDF = '/mnt/d/HDF'
-TIF_SAVE_PATH = '/mnt/d/classification'
-GEO_META_PATH = '/mnt/d/tif_meta'
-SAMPLE_PTS_PATH = '/mnt/d/sample_points'
+
+# Note the backslash, !!!DO NOT use windows style path
+BASE_PATH = '/mnt/e' 
+
+PATH_HDF = f'{BASE_PATH}/HDF'
+TIF_SAVE_PATH = f'{BASE_PATH}/classification'
+GEO_META_PATH = f'{BASE_PATH}/tif_meta'
+SAMPLE_PTS_PATH = f'{BASE_PATH}/sample_points'
+REFERENCE_DATA_PATH = f'{BASE_PATH}/reference_data'
 
 
 
 ############################################
 #           REGEION & NAME                 #
 ############################################
-REGION = 'xinan' # 'xibei,zhongnan,dongbei,huabei,huadong'
+REGION = 'huadong' # 'xinan,xibei,zhongnan,dongbei,huabei,huadong'
 YEAR_RANGE = '2020_2022'
 
 # the ShpFile to subset the input HDF data,
 # so that we can get partial result fast
 
-SUBSET_PATH = '/mnt/d/subset_SHP/subset_shp.shp'
-# SUBSET_PATH = 'None' # this will use the whole HDF file
+SUBSET_PATH = f'{BASE_PATH}/subset_SHP/subset_shp_{REGION}.shp'
+# SUBSET_PATH = 'None'
 
 ############################################
 #           MODEL PARAMETERS               #
 ############################################
 N_ESTIMATROS = 25
 MAX_DEPTH = 10
+TRAIN_SAMPLE_RATIO = 0.8
 
 # the hdf file are stored as chunks of 128*128
 # if the chunk_dilate = 2, then the input array 

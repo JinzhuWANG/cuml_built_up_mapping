@@ -2,16 +2,83 @@ import os
 import h5py
 from itertools import product
 from tqdm.auto import tqdm
+from glob import glob
+
 import numpy as np
+import pandas as pd
 import geopandas as gpd
 from rasterio import Affine
+
+from cuml.ensemble import RandomForestClassifier as cuRF
+from sklearn.metrics import classification_report
 
 # set upworking directory
 if __name__ == '__main__':
     os.chdir('..')
 
-from PARAMETER import CHUNK_DILATE, TIF_SAVE_PATH, REGION, SUBSET_PATH
-from tools import get_geo_meta
+from tools import get_geo_meta, get_hdf_files
+from PARAMETER import BASE_PATH, CHUNK_DILATE, MAX_DEPTH, N_ESTIMATROS, SAMPLE_PTS_PATH,\
+                      TIF_SAVE_PATH, REGION, SUBSET_PATH
+
+
+def get_models():
+    ''' get the trained models
+    INPUT:  None
+    OUTPUT: trained models'''
+    # import the sample points
+    sample_paths = glob(f'{SAMPLE_PTS_PATH}/sample_pts_{REGION}*.csv')
+
+    print(f'Training the models using sample_pts_{REGION}_X.csv ...')
+    print('The accuracy report will be saved to {BASE_PATH}/accuracy_{REGION}.csv ')
+
+    # read the sample points, 
+    #   sample_X is the image values (without the Built columns), 
+    #   sample_y is the built type (only the Built columns)
+    accuracies = []
+    models = {}
+
+    # loop through the sample paths
+    for path in tqdm(sample_paths):
+        # get the built_nonurban ratio from path
+        built_nonurban_ratio = path.split('_')[-1].split('.csv')[0]
+
+        # get the X and y
+        sample_X = pd.read_csv(path).drop(columns=['Built']).values
+        sample_y = pd.read_csv(path)['Built'].values
+
+        # train model with the sample points
+        model = cuRF( max_depth = MAX_DEPTH,
+                    n_estimators = N_ESTIMATROS )
+
+        trained_RF = model.fit( sample_X, sample_y )
+
+        # append the model to the dict
+        models[built_nonurban_ratio] = trained_RF
+        
+
+        # report the accuracy using the test data
+        test_X = np.load(f'{SAMPLE_PTS_PATH}/X_test_{REGION}.npy')
+        test_y = gpd.read_file(f'{SAMPLE_PTS_PATH}/y_test_{REGION}.shp')['Built'].values
+        accuracy = classification_report(test_y,
+                                        trained_RF.predict(test_X),
+                                        target_names=['Non-Built', 'Built'],
+                                        output_dict=True)
+        
+        # formatting the accuracy
+        accuracy = pd.DataFrame(accuracy).T.reset_index()
+        accuracy.columns = ['Indicator','precision','recall','f1-score','Sample Size']
+        accuracy.insert(0, 'Non-Built ratio', built_nonurban_ratio)
+
+        # append the accuracy to the list
+        accuracies.append(accuracy)
+
+    # concat the accuracy and save to disk
+    accuracies = pd.concat(accuracies)
+    accuracies.to_csv(f'{BASE_PATH}/accuracy_{REGION}.csv', index=False)
+
+    # return models
+    return models
+
 
 # function to calculate the start/end row/col index with a shp file
 def subset_bounds(shp:str=SUBSET_PATH):
@@ -91,71 +158,81 @@ def get_hdf_chunks(hdf_path,subset=SUBSET_PATH):
 
 
 # loop through hdf files and make prediction on each chunk
-def pred_hdf(hdf_paths, model):
-    ''' make prediction on the hdf file
+def pred_hdf(models):
+    ''' loop through hdf files and make prediction using trained models.
+
     INPUT:  hdf_path:    path to the hdf file
-            model:       trained model
-    OUTPUT: pred:        prediction array'''
+            model:       trained models of {nonurban_ratio: model}
 
-    # get the array sizes and chunks
-    hdf_arr_shape, chunk_dilate_size, chunks = get_hdf_chunks(list(hdf_paths)[0])
+    OUTPUT: None, but save the prediction to a hdf file'''
 
-    # create an empty hdf to store the prediction
-    with h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}.hdf', 'w') as f:
+    # get the hdf files
+    hdf_paths = get_hdf_files()
 
-        # create the dataset
-        dataset = f.create_dataset('classification', 
-                                shape= (1, *hdf_arr_shape[1:]), 
-                                dtype='int8', 
-                                chunks=(1, chunk_dilate_size, chunk_dilate_size),
-                                compression=7,
-                                fillvalue=0)
+    # loop through the models
+    for nonurban_ratio, model in tqdm(models.items(),total=len(models)):
+        print(f'Perform classification using the model trained with {nonurban_ratio} non-urban built-points...')
 
-    # open all the hdf file
-    hdf_arrs = []
-    for hdf_path in hdf_paths:
-        hdf_ds = h5py.File(hdf_path, 'r')
-        hdf_arr = hdf_ds[list(hdf_ds.keys())[0]]
+        # get the array sizes and chunks
+        hdf_arr_shape, chunk_dilate_size, chunks = get_hdf_chunks(list(hdf_paths)[0])
 
-        hdf_arrs.append(hdf_arr)
+        # create an empty hdf to store the prediction
+        with h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}_{nonurban_ratio}.hdf', 'w') as f:
 
-    for chunk in tqdm(chunks):
-        # get the array from the chunk (C, H, W)
-        input_arr = []
-        for hdf_arr in hdf_arrs:
-            arr_slice = hdf_arr[:,
-                                chunk[0]:chunk[0] + chunk_dilate_size,
-                                chunk[1]:chunk[1] + chunk_dilate_size]
-            # get the shape of the array_slice
-            arr_slice_shape = arr_slice.shape
-            
-            # reshape the array into (H*W, C)
-            arr_slice = np.moveaxis(arr_slice, 0, -1) # (H, W, C)
-            arr_slice = arr_slice.reshape(-1, arr_slice.shape[-1]) # (H*W, C)
-            input_arr.append(arr_slice)
+            # create the dataset
+            dataset = f.create_dataset('classification', 
+                                    shape= (1, *hdf_arr_shape[1:]), 
+                                    dtype='int8', 
+                                    chunks=(1, chunk_dilate_size, chunk_dilate_size),
+                                    compression=7,
+                                    fillvalue=0)
 
-        # reshape the input array into correct shape
-        input_arr = np.hstack(input_arr) # (n*H*W, C)
-  
-        # make prediction
-        pred = model.predict(input_arr.astype(np.float32)) # (H*W, 1)
+    
+        # open all the hdf file
+        hdf_arrs = []
+        for hdf_path in hdf_paths:
+            hdf_ds = h5py.File(hdf_path, 'r')
+            hdf_arr = hdf_ds[list(hdf_ds.keys())[0]]
 
-        # reshape pred into (H, W)
-        pred = pred.reshape(arr_slice_shape[-2], arr_slice_shape[-1])
+            hdf_arrs.append(hdf_arr)
 
-        # get the row/col index of the 
-        if os.path.exists(SUBSET_PATH):
-            row,col = corespond_index(chunk)
-        else:
-            row,col = chunk[0], chunk[1]
+        for chunk in tqdm(chunks):
+            # get the array from the chunk (C, H, W)
+            input_arr = []
+            for hdf_arr in hdf_arrs:
+                arr_slice = hdf_arr[:,
+                                    chunk[0]:chunk[0] + chunk_dilate_size,
+                                    chunk[1]:chunk[1] + chunk_dilate_size]
+                # get the shape of the array_slice
+                arr_slice_shape = arr_slice.shape
+                
+                # reshape the array into (H*W, C)
+                arr_slice = np.moveaxis(arr_slice, 0, -1) # (H, W, C)
+                arr_slice = arr_slice.reshape(-1, arr_slice.shape[-1]) # (H*W, C)
+                input_arr.append(arr_slice)
 
-        # save to hdf
-        with h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}.hdf', 'r+') as ds:
-            ds_arr = ds[list(ds.keys())[0]]
-            # save the pred to the hdf file
-            ds_arr[:,
-                   row:row + chunk_dilate_size,
-                   col:col + chunk_dilate_size] = pred
+            # reshape the input array into correct shape
+            input_arr = np.hstack(input_arr) # (n*H*W, C)
+    
+            # make prediction
+            pred = model.predict(input_arr.astype(np.float32)) # (H*W, 1)
+
+            # reshape pred into (H, W)
+            pred = pred.reshape(arr_slice_shape[-2], arr_slice_shape[-1])
+
+            # get the row/col index of the 
+            if os.path.exists(SUBSET_PATH):
+                row,col = corespond_index(chunk)
+            else:
+                row,col = chunk[0], chunk[1]
+
+            # save to hdf
+            with h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}_{nonurban_ratio}.hdf', 'r+') as ds:
+                ds_arr = ds[list(ds.keys())[0]]
+                # save the pred to the hdf file
+                ds_arr[:,
+                    row:row + chunk_dilate_size,
+                    col:col + chunk_dilate_size] = pred
 
 
 

@@ -1,6 +1,9 @@
 import os
+from glob import glob
+
 import geopandas as gpd
 import numpy as np
+
 import rasterio
 import h5py
 from rasterio import Affine
@@ -48,38 +51,45 @@ def arr_to_TIFF():
     OUTPUT: None, but export the tif file to the {TIF_SAVE_PATH}
     '''
     # open the HDF file, read the chunks
-    hdf_classified =  h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}.hdf', 'r')
-    hdf_classified_arr = hdf_classified['classification']
-    hdf_chunks = [chunck for chunck in hdf_classified['classification'].iter_chunks()]
+    hdf_classified_paths =  glob(f'{TIF_SAVE_PATH}/classification_{REGION}*.hdf')
+
+    for path in tqdm(hdf_classified_paths):
+        # get the nonurban_ratio
+        nonurban_ratio = path.split('_')[-1].split('.hdf')[0]
+        print(f'Processing the classified_hdf_{nonurban_ratio}...')
+
+        hdf_classified =  h5py.File(path, 'r')
+        hdf_classified_arr = hdf_classified['classification']
+        hdf_chunks = [chunck for chunck in hdf_classified['classification'].iter_chunks()]
 
 
-    # get the geo_transformation
-    tif_meta = get_geo_meta() 
-    tif_meta.update({'count': 1, 
-                     'dtype': 'int8', 
-                     'driver': 'GTiff',
-                     'compress': 'lzw',
-                     'height': hdf_classified_arr.shape[1],
-                     'width': hdf_classified_arr.shape[2]})
+        # get the geo_transformation
+        tif_meta = get_geo_meta() 
+        tif_meta.update({'count': 1, 
+                        'dtype': 'int8', 
+                        'driver': 'GTiff',
+                        'compress': 'lzw',
+                        'height': hdf_classified_arr.shape[1],
+                        'width': hdf_classified_arr.shape[2]})
 
-    # update the geo_transformation if subset is used
-    if os.path.exists(SUBSET_PATH):
-        # get the xy coordinates of the bounds of the shp
-        bounds = gpd.read_file(SUBSET_PATH).bounds
-        trans = list(tif_meta['transform'])
-        trans[2] = bounds['minx'].values[0]
-        trans[5] = bounds['maxy'].values[0]
-        tif_meta['transform'] = Affine(*trans)
-    
+        # update the geo_transformation if subset is used
+        if os.path.exists(SUBSET_PATH):
+            # get the xy coordinates of the bounds of the shp
+            bounds = gpd.read_file(SUBSET_PATH).bounds
+            trans = list(tif_meta['transform'])
+            trans[2] = bounds['minx'].values[0]
+            trans[5] = bounds['maxy'].values[0]
+            tif_meta['transform'] = Affine(*trans)
+        
 
-    # write the array to tif, chunk by chunk
-    with rasterio.open(f'{TIF_SAVE_PATH}/classification_{REGION}.tif', 
-                       'w',
-                       **tif_meta) as dst:
-        for chunk in tqdm(hdf_chunks):
-            arr = hdf_classified['classification'][chunk].astype(np.int8)
-            dst.write(arr, window=rasterio.windows.Window.from_slices(chunk[1], chunk[2]))
+        # write the array to tif, chunk by chunk
+        with rasterio.open(f'{TIF_SAVE_PATH}/classification_{REGION}_{nonurban_ratio}.tif', 
+                        'w',
+                        **tif_meta) as dst:
+            for chunk in tqdm(hdf_chunks):
+                arr = hdf_classified['classification'][chunk].astype(np.int8)
+                dst.write(arr, window=rasterio.windows.Window.from_slices(chunk[1], chunk[2]))
 
 
-    # close the hdf file
-    hdf_classified.close()
+        # close the hdf file
+        hdf_classified.close()
