@@ -1,21 +1,21 @@
 import os
-
-# setting up working directory
-if __name__ == '__main__':
-    os.chdir('..')
-
 import numpy as np
 import pandas as pd
 import geopandas as gpd
 import rasterio
 from tqdm.auto import tqdm
 
+# setting up working directory
+if __name__ == '__main__':
+    os.chdir('..')
+
 from PARAMETER import REGION, SAMPLE_PTS_PATH,TRAIN_SAMPLE_RATIO,REFERENCE_DATA_PATH
 
 
 
 # randomly train_test_split the sample points, and save them to {SAMPLE_PTS_PATH}
-def train_test_split_sample(train_sample_ratio=TRAIN_SAMPLE_RATIO, rand_state=0):
+def train_test_split_sample(train_sample_ratio=TRAIN_SAMPLE_RATIO, 
+                            rand_state=0):
     '''get the sample points from the hdf files, 
     and then split them into training and testing data.
 
@@ -41,12 +41,17 @@ def train_test_split_sample(train_sample_ratio=TRAIN_SAMPLE_RATIO, rand_state=0)
     X_test = np.delete(sample_X, train_idx, axis=0)
     y_test = sample_y.drop(train_idx)
 
-    # save the training and testing data
+    # save the training and testing data with spatial information
     np.save(f'{SAMPLE_PTS_PATH}/X_train_{REGION}.npy', X_train)
     y_train.to_file(f'{SAMPLE_PTS_PATH}/y_train_{REGION}.shp')
 
     np.save(f'{SAMPLE_PTS_PATH}/X_test_{REGION}.npy', X_test)
     y_test.to_file(f'{SAMPLE_PTS_PATH}/y_test_{REGION}.shp')
+
+    # save the training data without spatial information
+    X_train_df = pd.DataFrame(X_train)
+    X_train_df['Built'] = y_train['Built'].values
+    X_train_df.to_csv(f'{SAMPLE_PTS_PATH}/sample_pts_{REGION}_ALL_Train_Sample.csv', index=False)
 
     # report the size of training and testing data
     print(f'The size of training data is {len(X_train)}')

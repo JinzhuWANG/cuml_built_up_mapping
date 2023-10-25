@@ -27,6 +27,8 @@ increase_nonurban_pts()
 # i.e., if there are 5k non-urban built-points,  ratio = 0.1 means
 #       we will use 500 non-urban built-points to train the model
 
+# Also, each model will be evaluated by the test subset, and the 
+# accuracy will be saved to the root directory
 trained_models = get_models()
 
 
