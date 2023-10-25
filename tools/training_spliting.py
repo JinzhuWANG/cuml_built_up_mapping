@@ -104,8 +104,10 @@ def increase_nonurban_pts():
         sample_non_built = sample_non_built.sample(min(len(sample_built),len(sample_non_built)),
                                                    replace=False)
 
-        sample_pts = pd.concat([sample_built,sample_non_built])\
-                       .drop(columns=['OBJECTID','geometry','urban_mask','col','row'])
+        # keep only the columns we need
+        keep_cols = [i for i in sample_pts.columns 
+                     if i not in ['OBJECTID','geometry','urban_mask','col','row']]
+        sample_pts = pd.concat([sample_built,sample_non_built])[keep_cols]
         
 
         # save the sample points

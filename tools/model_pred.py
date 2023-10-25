@@ -18,7 +18,7 @@ if __name__ == '__main__':
     os.chdir('..')
 
 from tools import get_geo_meta, get_hdf_files
-from PARAMETER import BASE_PATH, CHUNK_DILATE, MAX_DEPTH, N_ESTIMATROS, SAMPLE_PTS_PATH,\
+from PARAMETER import BASE_PATH, CHUNK_DILATE, MAX_DEPTH, N_ESTIMATROS, SAMPLE_PTS_PATH, SUBSET,\
                       TIF_SAVE_PATH, REGION, SUBSET_PATH
 
 import warnings
@@ -171,9 +171,7 @@ def pred_hdf(models,force_use_nonurban_subset=False):
 
 
     # remove previously saved classification files if to classify the whole dataset,
-    # i.e., SUBSET_PATH == 'None', here we use {os.path.exists(f'{SUBSET_PATH}')} to check
-    #                              if the SUBSET_PATH is None
-    if not os.path.exists(f'{SUBSET_PATH}'):
+    if not SUBSET:
         print(f'Removing previously saved classification_{REGION} files...')
         for path in glob(f'{TIF_SAVE_PATH}/classification_{REGION}*'):
             os.remove(path)

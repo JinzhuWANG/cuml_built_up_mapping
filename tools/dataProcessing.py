@@ -34,8 +34,12 @@ def extract_img_val_to_sample():
 
         print('Extracting image values to sample points...\n')
 
-        # read the sample points
-        sample_pts = gpd.read_file(f'{SAMPLE_PTS_PATH}/merge_pts_{REGION}.shp')
+        # get the sample points
+        sample_path = f'{SAMPLE_PTS_PATH}/merge_pts_{REGION}.shp'
+        if not os.path.exists(sample_path):
+            raise ValueError(f'{sample_path} does not exist!')
+        
+        sample_pts = gpd.read_file(sample_path)
 
         # get the hdf files
         hdf_files = get_hdf_files()

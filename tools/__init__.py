@@ -19,6 +19,9 @@ def get_hdf_files():
     hdf_files = glob(f'{PATH_HDF}/{REGION}*.hdf')
     hdf_files = [i for i in hdf_files if (('terrain' in i)|(YEAR_RANGE in i))]
 
+    if len(hdf_files) == 0:
+        raise ValueError(f'No hdf file of {REGION} found in {PATH_HDF}!')
+
     return sorted(hdf_files)
 
 
