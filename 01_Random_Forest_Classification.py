@@ -38,7 +38,7 @@ trained_models = get_models()
 ############################################
 
 # apply the model to the hdf files, and then save the prediction to a hdf
-pred_hdf(trained_models)
+pred_hdf(trained_models,force_use_nonurban_subset=True)
 
 # save classified hdf to tif
 arr_to_TIFF()

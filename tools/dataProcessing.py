@@ -138,39 +138,45 @@ def overlay_classified_tif():
             # get the windows
             windows_rio = [window for _, window in src.block_windows()]
 
-        # create an empty array to store the overlayed result
-        overlayed_arr = np.zeros(array_shape, dtype=np.int8)
-
-        # read each tif file by iterating the window from the meta
-        for win in tqdm(windows_rio):
-
-            arrs = []
-            for tif in classified_tifs: 
-                with rasterio.open(tif) as src:
-                    # read the tif file
-                    arr = src.read(1, window=win)
-                    # record the array
-                    arrs.append(arr)
-
-            # sum the arrays
-            arrs_sum = np.array(arrs).sum(axis=0)
-
-            # filter the array
-            arrs_sum = np.where(arrs_sum >= OVERLAY_THRESHOLD, 1, 0)
-        
-            # get the overlayed result
-            overlayed_arr[win.toslices()] = arrs_sum
-
-        # save the overlayed result to tif
+        # update the meta
         meta.update({'count': 1, 
                     'dtype': 'int8', 
                     'driver': 'GTiff',
                     'compress': 'lzw'})
-        
-        with rasterio.open(f'{TIF_SAVE_PATH}/classification_{REGION}_overlayed.tif', 
-                            'w',
+
+        # create an empty array to store the overlayed result
+        overlayed_arr = np.zeros(array_shape, dtype=np.int8)
+
+        # save the empty array to disk
+        with rasterio.open(f'{TIF_SAVE_PATH}/classification_{REGION}_overlayed.tif','w',
                             **meta) as dst:
             dst.write(overlayed_arr,1)
+
+
+
+        # open the overlayed tif, and write sum_arry with window
+        with rasterio.open(f'{TIF_SAVE_PATH}/classification_{REGION}_overlayed.tif',
+                           'r+') as dst:
+
+            # read each tif file by iterating the window from the meta
+            for win in tqdm(windows_rio):
+
+                arrs = []
+                for tif in classified_tifs: 
+                    with rasterio.open(tif) as src:
+                        # read the tif file
+                        arr = src.read(1, window=win)
+                        # record the array
+                        arrs.append(arr)
+
+                # sum the arrays
+                arrs_sum = np.array(arrs).sum(axis=0)
+
+                # filter the array
+                arrs_sum = np.where(arrs_sum >= OVERLAY_THRESHOLD, 1, 0)
+
+                # write the overlayed result to disk
+                dst.write(arrs_sum,1,window=win)
 
 # calculate the accuracy of the overlayed result
 def calculate_overlay_accuracy():

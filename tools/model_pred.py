@@ -109,11 +109,19 @@ def subset_bounds(shp:str=SUBSET_PATH):
 
 
 def get_hdf_chunks(hdf_path,subset=SUBSET_PATH):
-    ''' get the chunks from the hdf file
-    INPUT:  hdf_path:           path to the hdf file
-    OUTPUT: hdf_arr_shape:      shape of the hdf array,
-            chunk_dilate_size:  the input array size to feed to the model,
-            chunks:             list of tuples of chunk indices'''
+    ''' 
+    Get the chunks from the hdf file.
+
+    Args:
+    - hdf_path (str): path to the hdf file
+    - subset (str): path to the subset file (default: SUBSET_PATH)
+
+    Returns:
+    - tuple: a tuple containing:
+        - hdf_arr_shape (tuple): shape of the hdf array
+        - chunk_dilate_size (int): the input array size to feed to the model
+        - chunks (list): list of tuples of chunk indices
+    '''
     # get the chunks
     with  h5py.File(hdf_path, 'r') as hdf_ds:
         hdf_arr = hdf_ds[list(hdf_ds.keys())[0]]
@@ -161,14 +169,16 @@ def get_hdf_chunks(hdf_path,subset=SUBSET_PATH):
 
 
 # loop through hdf files and make prediction on each chunk
-def pred_hdf(models,force_use_nonurban_subset=False):
-    ''' loop through hdf files and make prediction using trained models.
+def pred_hdf(models, force_use_nonurban_subset=False):
+    '''Loop through hdf files and make prediction using trained models.
 
-    INPUT:  hdf_path:    path to the hdf file
-            model:       trained models of {sample_type: model}
+    Args:
+        models (dict): A dictionary of trained models of {sample_type: model}.
+        force_use_nonurban_subset (bool, optional): Whether to force the use of non-urban subset for classification. Defaults to False.
 
-    OUTPUT: None, but save the prediction to a hdf file'''
-
+    Returns:
+        None, but saves the prediction to a hdf file.
+    '''
 
     # remove previously saved classification files if to classify the whole dataset,
     if not SUBSET:
