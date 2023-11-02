@@ -21,13 +21,13 @@ from PARAMETER import BASE_PATH, OVERLAY_THRESHOLD, SAMPLE_PTS_PATH, \
 from tools import get_hdf_files, get_geo_meta, extract_val_to_pt
 
 
-def extract_img_val_to_sample():
+def extract_img_val_to_sample(force_resample=False):
     ''' extract the image values to sample points
     INPUT:  None, but read the sample points from {SAMPLE_PTS_PATH}
     OUTPUT: None, but save the sample values to {SAMPLE_PTS_PATH}
     '''
     # check if the sample values already exist
-    if os.path.exists(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy'):
+    if os.path.exists(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy') and not force_resample:
         print('The sample values already exist!\n')
 
     else:

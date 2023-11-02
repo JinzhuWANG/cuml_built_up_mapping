@@ -197,12 +197,12 @@ def pred_hdf(models, force_use_nonurban_subset=False):
     print(f'''The higest accuracy is {highest_acc["f1-score"]:.2%} comming from {highest_acc["Sample type"]} subset\n''')
     
     # perform the classification
-    if (highest_acc['Sample type'] == 'ALL_Train_Sample') & (not force_use_nonurban_subset):
-        classify_hdf('ALL_Train_Sample', models['ALL_Train_Sample'])
+    if not force_use_nonurban_subset:
+        classify_hdf(highest_acc["Sample type"], models[highest_acc["Sample type"]])
     else:
         print('''=======================================================
-              The classification will use [10 non-urban built-samples] \
-                                      and [1 whole traning samples]
+              The classification will use [10 non-urban built-samples]
+                                    and [1 whole traning samples]
               =======================================================\n''')
         for sample_type, model in models.items():
             print(f'Classification using the model trained with {sample_type} non-urban subset...')

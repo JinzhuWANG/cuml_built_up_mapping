@@ -13,7 +13,8 @@ GEO_META_PATH = f'{BASE_PATH}/tif_meta'
 SAMPLE_PTS_PATH = f'{BASE_PATH}/sample_points'
 REFERENCE_DATA_PATH = f'{BASE_PATH}/reference_data'
 
-
+# define the path to tif files
+TIF_PATH = '/mnt/d/TIF'
 
 ############################################
 #           REGEION & NAME                 #

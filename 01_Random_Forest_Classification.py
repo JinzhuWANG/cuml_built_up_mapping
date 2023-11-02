@@ -10,7 +10,7 @@ from tools.training_spliting import increase_nonurban_pts, train_test_split_samp
 ############################################
 
 # 1) extract image values to sample points
-extract_img_val_to_sample()
+extract_img_val_to_sample(force_resample=True)
 # 2) split sample into train and test subset
 train_test_split_sample()
 # 3) gradually increse the size of non-urban built points
