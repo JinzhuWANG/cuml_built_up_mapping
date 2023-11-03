@@ -5,6 +5,12 @@ import h5py
 import numpy as np
 from tqdm.auto import tqdm
 
+# set up working directory
+if __name__ == '__main__':
+    os.chdir('../..')
+
+from PARAMETER import TIF_PATH
+
 
 # function to extract names from tif_path
 def get_str_info(path):
@@ -23,7 +29,49 @@ def get_str_info(path):
     
     return matchs
 
+# function to retry convertion
+def retry_convertion(func, max_retries = 3):
+    """
+    A decorator function that retries a given function a specified number of times if it fails.
+    
+    Args:
+    - func: the function to be retried
+    - max_retries: the maximum number of times to retry the function
+    
+    Returns:
+    - wraper: a wrapper function that retries the given function if it fails
+    """
+    
+    completed_convertions = f'{TIF_PATH}/meta/vrt2hdf_complete.csv'
+    failed_convertions = f'{TIF_PATH}/meta/vrt2hdf_incomplete.csv'
+
+    def wraper(vrt,PATH_HDF):
+
+        attempts = 0
+        while attempts < max_retries:
+
+            attempts = attempts + 1
+            try:
+
+                # convert vrt to hdf, the function return nothing
+                out = func(vrt,PATH_HDF)        
+                # write the sccessefuly transfered files        
+                with open(completed_convertions,'a',encoding='utf-8') as f:
+                    f.write(f"{vrt}\n")   
+                return out
+            
+            except:
+                
+                print(f"Convert of {vrt} failed! Retrying {attempts}/{max_retries}")
+                
+        # if passed the max_retries, then write the failed files
+        with open(failed_convertions,'a',encoding='utf-8') as f:
+                    f.write(f"{vrt}\n")
+                               
+    return wraper
+
 # function to save an vrt to hdf
+@retry_convertion
 def vrt2hdf(vrt,save_path):
     '''
     Function to save vrt raster file to hdf
@@ -51,7 +99,7 @@ def vrt2hdf(vrt,save_path):
     block_num = (int(ds_shape[0]/block_size) + 1) * (int(ds_shape[1]/block_size) + 1)
 
     # define the path/name for save
-    hdf_name = vrt_name.replace('vrt','hdf')
+    hdf_name = os.path.splitext(os.path.basename(vrt))[0] + '.hdf'
     out_hdf_path = os.path.abspath(f'{save_path}/{hdf_name}')
 
     # create an hdf file for writing
@@ -59,14 +107,16 @@ def vrt2hdf(vrt,save_path):
         # Create a dataset and save the NumPy array to it
         hdf_file.create_dataset(vrt_name, 
                                 shape=(ds.count,*ds_shape),
-                                dtype=np.int16, 
+                                dtype=list(ds.dtypes)[0], 
                                 fillvalue=0, 
                                 compression='lzf', 
                                 # compression_opts=7,
                                 chunks=(ds.count,block_size,block_size))
 
         # loop throught each block to save the block array to hdf
-        for _,window in tqdm(ds.block_windows(),total=block_num,leave=True,desc=f'Saving {vrt_name} to HDF \n'):
+        print(f"Converting {vrt} to {hdf_name}")
+        for _,window in tqdm(ds.block_windows(), total=block_num):
+                            
             arr = ds.read(window=window)
 
             # write the block arry to hdf

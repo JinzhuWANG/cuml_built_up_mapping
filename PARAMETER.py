@@ -1,5 +1,26 @@
 # Description: This file contains all the parameters used in the project
 
+
+
+############################################
+#            Data Preparation              #
+############################################
+
+# define the expression to calculate the Normalized Index
+INDICES_CAL_EXPRESSION = {
+                            'NDWI':{ 'Landsat5':'(Band_4 - Band_2) / (Band_4 + Band_2)',
+                                     'Landsat7':'(Band_4 - Band_5) / (Band_4 + Band_5)',
+                                     'Landsat8':'(Band_5 - Band_6) / (Band_5 + Band_6)'
+                                    }
+                        }
+
+# define the path to RAW_TIF files
+# These tif files were downloaded from Google Earth Engine             # change this if you want to use your own data
+# and will be converted to hdf files
+
+TIF_PATH = '/mnt/d/TIF'
+
+
 ############################################
 #               Data PATH                  #
 ############################################
@@ -13,8 +34,9 @@ GEO_META_PATH = f'{BASE_PATH}/tif_meta'
 SAMPLE_PTS_PATH = f'{BASE_PATH}/sample_points'
 REFERENCE_DATA_PATH = f'{BASE_PATH}/reference_data'
 
-# define the path to tif files
-TIF_PATH = '/mnt/d/TIF'
+
+
+
 
 ############################################
 #           REGEION & NAME                 #
@@ -32,6 +54,8 @@ if SUBSET == True:
     SUBSET_PATH = f'{BASE_PATH}/subset_SHP/subset_shp_{REGION}.shp'        
 else:
     SUBSET_PATH = 'None'    
+
+
 
 
 ############################################

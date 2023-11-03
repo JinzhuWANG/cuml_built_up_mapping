@@ -1,8 +1,21 @@
-from PARAMETER import REGION, SUBSET_PATH
+
+
 from tools.model_pred import get_models, pred_hdf
-from tools.dataProcessing import arr_to_TIFF, calculate_overlay_accuracy,\
-                                 extract_img_val_to_sample, overlay_classified_tif
 from tools.training_spliting import increase_nonurban_pts, train_test_split_sample
+from tools.dataProcessing import arr_to_TIFF, calculate_overlay_accuracy,\
+                                 extract_img_val_to_sample, overlay_classified_tif,\
+                                 compute_indices_for_all_landsat
+
+
+
+############################################
+#             Data preparing               #
+############################################
+
+# 1) compute the Normalized Index for all the Landsat images
+compute_indices_for_all_landsat()
+
+
 
 
 ############################################

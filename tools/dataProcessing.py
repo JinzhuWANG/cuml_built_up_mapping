@@ -16,9 +16,131 @@ import re
 if __name__ == '__main__':
     os.chdir('..')
 
-from PARAMETER import BASE_PATH, OVERLAY_THRESHOLD, SAMPLE_PTS_PATH, \
-                      REGION, SUBSET_PATH, TIF_SAVE_PATH
+
+from PARAMETER import BASE_PATH, OVERLAY_THRESHOLD, SAMPLE_PTS_PATH, PATH_HDF, \
+                      REGION, SUBSET_PATH, TIF_SAVE_PATH, INDICES_CAL_EXPRESSION
+
 from tools import get_hdf_files, get_geo_meta, extract_val_to_pt
+from dataprep.dataprep_tools import get_str_info
+
+
+
+def compute_indices_for_all_landsat():
+     # get the hdf files
+    hdf_files = get_hdf_files()
+    hdf_landsat = [f for f in hdf_files if 'Landsat' in f]
+
+    # loop through each landsat hdf file
+    for path in hdf_landsat:
+
+        # loop through each index
+        indices = INDICES_CAL_EXPRESSION.keys()
+
+        for index in indices:
+            # check if the index already exist
+            year_range = get_str_info(path)[-1]
+            index_path = f"{PATH_HDF}/{REGION}_{index}_{year_range}.hdf"
+
+            if os.path.exists(index_path):
+                print(f'{index_path} already exists!\n')
+            else:
+                # compute the index
+                print(f'Computing {index} for {os.path.basename(path)}...')
+                compute_normalized_indices(path, index)
+
+
+
+def compute_indices(arr_slice, year, index:str):
+    """
+    Computes the index for a given Landsat type and array slice.
+
+    Args:
+        arr_slice (numpy.ndarray): The array slice to compute the index for.
+        year (int): The year of the Landsat type.
+        index (str): The index to compute.
+
+    Returns:
+        numpy.ndarray: The computed index array.
+    """
+    # convert the array to float32
+    arr_slice = arr_slice.astype(np.float32)
+
+    # get the landsat type
+    if year<=2010:
+        landsat_type = 'Landsat5'
+    elif year<=2013:
+        landsat_type = 'Landsat7'
+    else:
+        landsat_type = 'Landsat8'
+
+    # get the expression
+    expression = INDICES_CAL_EXPRESSION[index][landsat_type]
+    # use re to replace the band name with the array
+    for band in range(arr_slice.shape[0]):
+        expression = re.sub(f'Band_{band}',f'arr_slice[{band-1}]',expression)
+
+    # compute the index
+    index_arr = eval(expression)
+
+    return index_arr
+
+
+
+
+def compute_normalized_indices(landsat_img_path:str,index:str):
+    """
+    Computes a list of normalized indices for a Landsat image and saves them to an HDF5 file.
+
+    Args:
+    - landsat_img_path (str): the path to the Landsat image file in HDF format.
+    - indices: a string with a single index name.
+
+    Returns:
+    None
+    """
+
+    # get the year of the landsat image
+    region,img_type,year_range = get_str_info(landsat_img_path)
+    year = int(year_range[-4:])
+
+    # create the name for output hdf file
+    out_name = f"{PATH_HDF}/{region}_{index}_{year_range}.hdf"
+
+    # get the shape, blocks of the landsat image
+    landsat_hdf = h5py.File(landsat_img_path, 'r')
+    landsat_arr = landsat_hdf[list(landsat_hdf.keys())[0]]
+    ds_shape = landsat_arr.shape
+    block_size = landsat_arr.chunks[1]
+
+    # create an empty hdf file for holding the computed indices
+    with h5py.File(out_name,mode='w') as hdf_file:
+        # Create a dataset and save the NumPy array to it
+        hdf_file.create_dataset(index, 
+                                shape=ds_shape,
+                                dtype=np.float16, 
+                                fillvalue=np.nan, 
+                                compression='lzf', 
+                                chunks=(ds_shape[0],block_size,block_size))
+
+    # loop through each block to compute the indices
+    slice_rows = range(0,ds_shape[1],block_size)
+    slice_cols = range(0,ds_shape[2],block_size)
+    slices = [(slice(None),slice(row,row+block_size),slice(col,col+block_size))
+                    for row in slice_rows for col in slice_cols]
+    
+    # loop through each slice and compute the index
+    for slice_ in tqdm(slices):
+        # get the array_slice
+        arr_slice = landsat_arr[slice_]
+        # compute the index
+        index_arr = compute_indices(arr_slice, year, index)
+        # save the index to hdf
+        with h5py.File(out_name,mode='r+') as hdf_file:
+            hdf_file[index][slice_] = index_arr
+
+
+
+
 
 
 def extract_img_val_to_sample(force_resample=False):
