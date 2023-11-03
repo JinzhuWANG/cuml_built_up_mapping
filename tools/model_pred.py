@@ -18,6 +18,7 @@ if __name__ == '__main__':
     os.chdir('..')
 
 from tools import get_geo_meta, get_hdf_files
+from dataprep.dataprep_tools import get_str_info
 from PARAMETER import BASE_PATH, CHUNK_DILATE, MAX_DEPTH, N_ESTIMATROS, SAMPLE_PTS_PATH, SUBSET,\
                       TIF_SAVE_PATH, REGION, SUBSET_PATH
 
@@ -304,3 +305,94 @@ def corespond_index(row_col_from):
     row_col_to = ~geo_trans_to*yx_coord_from
 
     return (int(row_col_to[1]), int(row_col_to[0]))
+
+
+def get_bands_index():
+    """
+    Returns a dataframe containing the index for each band type in the HDF files.
+    The dataframe has two columns: 'band_type' and 'indices'.
+    'band_type' is a string representing the type of band (e.g. 'Fourier', 'NDWI', ...).
+    'indices' is a list of integers representing the index for each band type.
+    """
+
+    hdfs = get_hdf_files()
+
+    bands_info = []
+    for hdf in hdfs:
+        with h5py.File(hdf, 'r') as ds:
+            hdf_arr = ds[list(ds.keys())[0]]
+            band_type = get_str_info(hdf)[1]
+            band_count = hdf_arr.shape[0]
+        
+        bands_info.append({'band_type':band_type, 
+                           'band_count':band_count})
+    # put bands_info into a dataframe
+    bands_info = pd.DataFrame(bands_info)
+
+    # get the index for each band type
+    bands_info['cum_sum'] = bands_info['band_count'].cumsum()
+    bands_info['start_index'] = bands_info['cum_sum'] - bands_info['band_count']
+    bands_info['end_index'] = bands_info['cum_sum'] 
+    bands_info['indices'] = bands_info.apply(lambda x: list(range(x['start_index'], x['end_index'])), axis=1)
+
+    return bands_info[['band_type','indices']]
+
+
+
+def split_sample_to_bands():
+    """
+    Splits the sample points into bands and returns a DataFrame 
+    with the band type and sample array for each band.
+
+    Returns:
+    pandas.DataFrame: A DataFrame with the band type and sample array for each band.
+    """
+    # read the sample points
+    sample = pd.read_csv(f'{SAMPLE_PTS_PATH}/sample_pts_{REGION}_ALL_Train_Sample.csv')
+
+    # get the bands
+    bands = get_bands_index()
+
+    # check if all bands are in the sample
+    assert (bands['indices'].apply(len).sum() == len(sample.columns) -1), 'Not all bands are in the sample'
+
+    bands['sample_arr'] = bands.apply(lambda x: sample.iloc[:,x['indices']].values, axis=1)
+
+    return bands[['band_type','indices','sample_arr']]
+
+
+def get_bands_accuracy():
+
+    # get bands and its coreponding sample array
+    bands = split_sample_to_bands()
+
+    # train model for each band
+    train_y = pd.read_csv(f'{SAMPLE_PTS_PATH}/sample_pts_{REGION}_ALL_Train_Sample.csv')
+    train_y = train_y[train_y.columns[-1]].values
+
+    bands['model'] = bands.apply(lambda x: cuRF( max_depth = MAX_DEPTH,n_estimators = N_ESTIMATROS )\
+                                            .fit(x['sample_arr'], train_y), axis=1)
+
+    # get the accuracy for each band
+    test_X = np.load(f'{SAMPLE_PTS_PATH}/X_test_{REGION}.npy')
+    test_y = gpd.read_file(f'{SAMPLE_PTS_PATH}/y_test_{REGION}.shp')['Built'].values
+
+    # get the accuracy for each band
+    accuracies = []
+    for _, row in bands.iterrows():
+        pred = row['model'].predict(test_X[:,row['indices']])
+        accuracy = classification_report(test_y, 
+                                        pred, 
+                                        target_names=['Non-Built', 'Built'], 
+                                        output_dict=True)
+
+        # formatting the accuracy
+        accuracy = pd.DataFrame(accuracy).T.reset_index()
+        
+        accuracy.columns = ['Indicator','precision','recall','f1-score','Sample Size']
+        accuracy.insert(0, 'Band type', row['band_type'])
+        accuracies.append(accuracy)
+
+    # format and save to disk
+    accurices = pd.concat(accuracies)
+    accurices.to_csv(f'{BASE_PATH}/accuracy_{REGION}_bands.csv', index=False)

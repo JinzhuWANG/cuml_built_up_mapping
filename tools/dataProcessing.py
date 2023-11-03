@@ -25,7 +25,7 @@ from dataprep.dataprep_tools import get_str_info
 
 
 
-def compute_indices_for_all_landsat():
+def get_custom_indices():
      # get the hdf files
     hdf_files = get_hdf_files()
     hdf_landsat = [f for f in hdf_files if 'Landsat' in f]
@@ -118,12 +118,12 @@ def compute_normalized_indices(landsat_img_path:str,index:str):
     with h5py.File(out_name,mode='w') as hdf_file:
         # Create a dataset and save the NumPy array to it
         hdf_file.create_dataset(index, 
-                                shape=ds_shape,
+                                shape=(1,ds_shape[1],ds_shape[2]),
                                 dtype=np.int8, 
                                 fillvalue=np.nan, 
                                 compression="gzip", 
                                 compression_opts=9,
-                                chunks=(ds_shape[0],block_size,block_size))
+                                chunks=(1,block_size,block_size))
 
     # loop through each block to compute the indices
     slice_rows = range(0,ds_shape[1],block_size)
