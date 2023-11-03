@@ -44,5 +44,3 @@ VRT_files = sorted(VRT_files,key=lambda x:reg_year.findall(x)[0],reverse=True)
 # convert VRT to HDF
 for vrt in VRT_files:
     successed = vrt2hdf(vrt,PATH_HDF)
-
-

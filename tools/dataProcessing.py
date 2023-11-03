@@ -81,6 +81,8 @@ def compute_indices(arr_slice, year, index:str):
 
     # compute the index
     index_arr = eval(expression)
+    # rescale and change the dtype
+    index_arr = (index_arr*127).astype(np.int8)
 
     return index_arr
 
@@ -117,9 +119,10 @@ def compute_normalized_indices(landsat_img_path:str,index:str):
         # Create a dataset and save the NumPy array to it
         hdf_file.create_dataset(index, 
                                 shape=ds_shape,
-                                dtype=np.float16, 
+                                dtype=np.int8, 
                                 fillvalue=np.nan, 
-                                compression='lzf', 
+                                compression="gzip", 
+                                compression_opts=9,
                                 chunks=(ds_shape[0],block_size,block_size))
 
     # loop through each block to compute the indices

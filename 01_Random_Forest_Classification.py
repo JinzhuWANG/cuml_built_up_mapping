@@ -13,6 +13,7 @@ from tools.dataProcessing import arr_to_TIFF, calculate_overlay_accuracy,\
 ############################################
 
 # 1) compute the Normalized Index for all the Landsat images
+# NOTE the values are rescaled to -127 ~ 127 as int8
 compute_indices_for_all_landsat()
 
 

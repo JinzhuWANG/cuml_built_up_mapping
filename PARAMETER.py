@@ -17,7 +17,6 @@ INDICES_CAL_EXPRESSION = {
 # define the path to RAW_TIF files
 # These tif files were downloaded from Google Earth Engine             # change this if you want to use your own data
 # and will be converted to hdf files
-
 TIF_PATH = '/mnt/d/TIF'
 
 

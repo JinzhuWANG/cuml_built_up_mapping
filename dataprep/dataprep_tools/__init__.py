@@ -107,9 +107,10 @@ def vrt2hdf(vrt,save_path):
         # Create a dataset and save the NumPy array to it
         hdf_file.create_dataset(vrt_name, 
                                 shape=(ds.count,*ds_shape),
-                                dtype=list(ds.dtypes)[0], 
+                                dtype=np.uint8, 
                                 fillvalue=0, 
-                                compression='lzf', 
+                                compression="gzip", 
+                                compression_opts=9,
                                 # compression_opts=7,
                                 chunks=(ds.count,block_size,block_size))
 
