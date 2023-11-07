@@ -1,5 +1,7 @@
 import os
 from glob import glob
+import re
+from functools import partial
 
 import geopandas as gpd
 import numpy as np
@@ -10,7 +12,10 @@ import h5py
 from rasterio import Affine
 from sklearn.metrics import classification_report
 from tqdm.auto import tqdm
-import re
+from numpy.linalg import solve
+
+
+
 
 # setting up working directory
 if __name__ == '__main__':
@@ -18,35 +23,70 @@ if __name__ == '__main__':
 
 
 from PARAMETER import BASE_PATH, OVERLAY_THRESHOLD, SAMPLE_PTS_PATH, PATH_HDF, \
-                      REGION, SUBSET_PATH, TIF_SAVE_PATH, INDICES_CAL_EXPRESSION
+                      REGION, SUBSET_PATH, TIF_SAVE_PATH, INDICES_CAL_EXPRESSION, YEAR_RANGE
 
+from tools.model_pred import get_bands_index
 from tools import get_hdf_files, get_geo_meta, extract_val_to_pt
 from dataprep.dataprep_tools import get_str_info
 
+class compute_custom_indices_by_chunk():
+
+    def __init__(self, img_path:str, 
+                 compute_type:str, 
+                 dtype:np.dtype=np.int8,
+                 *args,
+                 **kwargs):
+
+        self.img_path = img_path
+        self.compute_type = compute_type
+        self.dtype = dtype
+        self.args = args
+        self.kwargs = kwargs
 
 
-def get_custom_indices():
-     # get the hdf files
-    hdf_files = get_hdf_files()
-    hdf_landsat = [f for f in hdf_files if 'Landsat' in f]
+    def __call__(self, compute_func:callable,):
+        def wrapper():
+            # get the year of the landsat image
+            region,_,year_range = get_str_info(self.img_path)
+            year = int(year_range[-4:])
 
-    # loop through each landsat hdf file
-    for path in hdf_landsat:
+            # create the name for output hdf file
+            out_name = f"{PATH_HDF}/{region}_{self.compute_type}_{year_range}.hdf"
 
-        # loop through each index
-        indices = INDICES_CAL_EXPRESSION.keys()
+            # get the shape, blocks of the landsat image
+            landsat_hdf = h5py.File(self.img_path, 'r')
+            landsat_arr = landsat_hdf[list(landsat_hdf.keys())[0]]
+            ds_shape = landsat_arr.shape
+            block_size = landsat_arr.chunks[1]
 
-        for index in indices:
-            # check if the index already exist
-            year_range = get_str_info(path)[-1]
-            index_path = f"{PATH_HDF}/{REGION}_{index}_{year_range}.hdf"
+            # create an empty hdf file for holding the computed indices
+            with h5py.File(out_name,mode='w') as hdf_file:
+                # Create a dataset and save the NumPy array to it
+                hdf_file.create_dataset(self.compute_type, 
+                                        shape=(1,ds_shape[1],ds_shape[2]),
+                                        dtype=self.dtype,
+                                        fillvalue=np.nan, 
+                                        compression="gzip", 
+                                        compression_opts=9,
+                                        chunks=(1,block_size,block_size))
 
-            if os.path.exists(index_path):
-                print(f'{index_path} already exists!\n')
-            else:
+            # loop through each block to compute the indices
+            slice_rows = range(0,ds_shape[1],block_size)
+            slice_cols = range(0,ds_shape[2],block_size)
+            slices = [(slice(None),slice(row,row+block_size),slice(col,col+block_size))
+                            for row in slice_rows for col in slice_cols]
+            
+            # loop through each slice and compute the index
+            for slice_ in tqdm(slices):
+                # get the array_slice
+                arr_slice = landsat_arr[slice_]
                 # compute the index
-                print(f'Computing {index} for {os.path.basename(path)}...')
-                compute_normalized_indices(path, index)
+                index_arr = compute_func(arr_slice, *self.args, **self.kwargs)
+                # save the index to hdf
+                with h5py.File(out_name,mode='r+') as hdf_file:
+                    hdf_file[self.compute_type][slice_] = index_arr
+
+        return wrapper
 
 
 
@@ -66,9 +106,9 @@ def compute_indices(arr_slice, year, index:str):
     arr_slice = arr_slice.astype(np.float32)
 
     # get the landsat type
-    if year<=2010:
+    if int(year)<=2010:
         landsat_type = 'Landsat5'
-    elif year<=2013:
+    elif int(year)<=2013:
         landsat_type = 'Landsat7'
     else:
         landsat_type = 'Landsat8'
@@ -89,59 +129,88 @@ def compute_indices(arr_slice, year, index:str):
 
 
 
-def compute_normalized_indices(landsat_img_path:str,index:str):
-    """
-    Computes a list of normalized indices for a Landsat image and saves them to an HDF5 file.
-
-    Args:
-    - landsat_img_path (str): the path to the Landsat image file in HDF format.
-    - indices: a string with a single index name.
-
-    Returns:
-    None
-    """
-
-    # get the year of the landsat image
-    region,img_type,year_range = get_str_info(landsat_img_path)
-    year = int(year_range[-4:])
-
-    # create the name for output hdf file
-    out_name = f"{PATH_HDF}/{region}_{index}_{year_range}.hdf"
-
-    # get the shape, blocks of the landsat image
-    landsat_hdf = h5py.File(landsat_img_path, 'r')
-    landsat_arr = landsat_hdf[list(landsat_hdf.keys())[0]]
-    ds_shape = landsat_arr.shape
-    block_size = landsat_arr.chunks[1]
-
-    # create an empty hdf file for holding the computed indices
-    with h5py.File(out_name,mode='w') as hdf_file:
-        # Create a dataset and save the NumPy array to it
-        hdf_file.create_dataset(index, 
-                                shape=(1,ds_shape[1],ds_shape[2]),
-                                dtype=np.int8, 
-                                fillvalue=np.nan, 
-                                compression="gzip", 
-                                compression_opts=9,
-                                chunks=(1,block_size,block_size))
-
-    # loop through each block to compute the indices
-    slice_rows = range(0,ds_shape[1],block_size)
-    slice_cols = range(0,ds_shape[2],block_size)
-    slices = [(slice(None),slice(row,row+block_size),slice(col,col+block_size))
-                    for row in slice_rows for col in slice_cols]
+def get_custom_indices():
     
-    # loop through each slice and compute the index
-    for slice_ in tqdm(slices):
-        # get the array_slice
-        arr_slice = landsat_arr[slice_]
-        # compute the index
-        index_arr = compute_indices(arr_slice, year, index)
-        # save the index to hdf
-        with h5py.File(out_name,mode='r+') as hdf_file:
-            hdf_file[index][slice_] = index_arr
+    # loop through each index
+    Landsat_img_path = f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf"
+    indices = INDICES_CAL_EXPRESSION.keys()
+
+    for index in indices:
+        # check if the index already exist
+        year_range = get_str_info(Landsat_img_path)[-1]
+        index_path = f"{PATH_HDF}/{REGION}_{index}_{year_range}.hdf"
+
+        if os.path.exists(index_path):
+            print(f'{index_path} already exists!\n')
+        else:
+            # compute the index
+            print(f'Computing {index} for {os.path.basename(Landsat_img_path)}...')
+
+            # Decorate the compute_indices function
+            compute_indices_decorated = compute_custom_indices_by_chunk(
+                                    img_path=Landsat_img_path,
+                                    compute_type=index,
+                                    dtype=np.int8)(partial(compute_indices,
+                                                           year=int(year_range[-4:]),
+                                                           index=index))
+            
+            # Invoke the docorated function
+            compute_indices_decorated()
 
 
+@compute_custom_indices_by_chunk(img_path=f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf",
+                                compute_type='Spectral_Unmixing',
+                                dtype=np.int8)
+def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
+    ''' spectral unmixing for the arr
+    INPUT:  arr: array with shape (C, H, W)
+            end_numbers: array with shape (C, N)
+    OUTPUT: unmixing_arr: array with shape (N, H, W)
+    '''
+    # get the shape of the array
+    C, H, W = arr.shape
+    # get the number of endmembers
+    N = end_numbers.shape[1] # in_shapge -> (C, N)
+
+    # reshape the array
+    arr = arr.reshape(C,H*W)
+    # solve the linear equation
+    unmixing_arr = solve(end_numbers.T, arr)
+    # apply softmax
+    unmixing_arr = np.exp(unmixing_arr)/np.sum(np.exp(unmixing_arr),axis=0)
+    # reshape the array
+    unmixing_arr = unmixing_arr.reshape(N,H,W)
+    # multiply 127 and convert dtype to int8
+    unmixing_arr = (unmixing_arr*127).astype(np.int8)
+
+    return unmixing_arr
+
+    
+
+def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free'):
+    # check if the spectral unmixing already exist
+    year_range = get_str_info(f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf")[-1]
+    spectral_unmixing_path = f"{PATH_HDF}/{REGION}_Spectral_Unmixing_{year_range}.hdf"
+
+    if os.path.exists(spectral_unmixing_path):
+        print(f'{spectral_unmixing_path} already exists!\n')
+    else:
+        # get the endmembers
+        endmembers = np.load(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy')
+        unmixing_sample_colunms = get_bands_index()
+        if not unmixing_from in unmixing_sample_colunms['band_type']:
+            raise ValueError(f'{unmixing_from} should be one of {unmixing_sample_colunms["band_type"].tolist()}!')
+
+        endmembers = endmembers[:,unmixing_sample_colunms.query(f'band_type=="{unmixing_from}"')['indices'].tolist()]
+
+        # compute the spectral unmixing
+        spectral_unmixing_decorated = compute_custom_indices_by_chunk(
+                                        img_path=f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf",
+                                        compute_type='Spectral_Unmixing',
+                                        dtype=np.int8)(partial(spectral_unmixing,
+                                                                end_numbers=endmembers))
+        # invoke the decorated function
+        spectral_unmixing_decorated()
 
 
 
@@ -156,29 +225,40 @@ def extract_img_val_to_sample(force_resample=False):
         print('The sample values already exist!\n')
 
     else:
-
         print('Extracting image values to sample points...\n')
 
         # get the sample points
         sample_path = f'{SAMPLE_PTS_PATH}/merge_pts_{REGION}.shp'
-        if not os.path.exists(sample_path):
-            raise ValueError(f'{sample_path} does not exist!')
+        unmixing_sample_path = f'{SAMPLE_PTS_PATH}/Spectral_unmixing_samples_{REGION}.shp'
+
+        for sample_type,path in zip(['sample_classification', 'sample_unmixing'],
+                                    [sample_path, unmixing_sample_path]):
+            # check if the path exists
+            if not os.path.exists(path):
+                raise ValueError(f'{path} does not exist!')    
+            # extract the image values to sample points
+            img_val_to_point(sample_type,path)
         
-        sample_pts = gpd.read_file(sample_path)
+def img_val_to_point(sample_type,sample_path:str):
+    sample_pts = gpd.read_file(sample_path)
 
-        # get the hdf files
-        hdf_files = get_hdf_files()
+    # get the hdf files
+    hdf_files = get_hdf_files()
 
-        # convert the xy coordinate to col/row index
-        geo_trans = get_geo_meta()['transform']
-        sample_pts[['col','row']] = sample_pts['geometry'].apply(lambda geo:~geo_trans*(geo.x,geo.y)).tolist()
-        sample_pts[['col','row']] = sample_pts[['col','row']].astype(int)
+    # convert the xy coordinate to col/row index
+    geo_trans = get_geo_meta()['transform']
+    sample_pts[['col','row']] = sample_pts['geometry'].apply(lambda geo:~geo_trans*(geo.x,geo.y)).tolist()
+    sample_pts[['col','row']] = sample_pts[['col','row']].astype(int)
 
-        # get the sample values from hdf files
-        sample_values = np.hstack([extract_val_to_pt(sample_pts,f) for f in hdf_files])
+    # get the sample values from hdf files
+    sample_values = np.hstack([extract_val_to_pt(sample_pts,f) for f in hdf_files])
 
-        # save the sample values
+    # save the sample values
+    if sample_type == 'sample_classification':
         np.save(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy',sample_values)
+    else:
+        np.save(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy',sample_values)
+
 
 
 def arr_to_TIFF():
