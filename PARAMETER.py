@@ -6,9 +6,19 @@
 #            Data Preparation              #
 ############################################
 
-'''Explaination on the Spectral-Unmixing sample points:
-    1) we collected 3 types of sample points: urban, vegetation, water
-    2) these points are coded as [0,1,2] in the unmixing_t column'''
+# the unmixing dictionary between lucc and its id,
+# here we use 'bare' to mask the prediction, meaning
+# that only if a pixel has the highest probability of being
+# bare land (among ['bare','vegetation', 'water']), then 
+# it will be passed to the Random Forest model. Otherwise,
+# it will be assigned with the value of 0.
+
+UNMIXING_LU_ID = {'bare':0,
+                  'vegetation':1,
+                  'water':2} 
+
+UNMIXING_LU = 'bare'
+
 
 
 
@@ -19,6 +29,8 @@ INDICES_CAL_EXPRESSION = {
                                      'Landsat8':'(Band_5 - Band_6) / (Band_5 + Band_6)'
                                     }
                         }
+
+
 
 # define the path to RAW_TIF files
 # These tif files were downloaded from Google Earth Engine             # change this if you want to use your own data

@@ -19,8 +19,8 @@ if __name__ == '__main__':
 
 from tools import get_geo_meta, get_hdf_files
 from dataprep.dataprep_tools import get_str_info
-from PARAMETER import BASE_PATH, CHUNK_DILATE, MAX_DEPTH, N_ESTIMATROS, SAMPLE_PTS_PATH, SUBSET,\
-                      TIF_SAVE_PATH, REGION, SUBSET_PATH
+from PARAMETER import BASE_PATH, CHUNK_DILATE, MAX_DEPTH, N_ESTIMATROS, PATH_HDF, SAMPLE_PTS_PATH, SUBSET,\
+                      TIF_SAVE_PATH, REGION, SUBSET_PATH, UNMIXING_LU, UNMIXING_LU_ID, YEAR_RANGE
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -209,6 +209,30 @@ def pred_hdf(models, force_use_nonurban_subset=False):
             print(f'Classification using the model trained with {sample_type} non-urban subset...')
             classify_hdf(sample_type, model)
             
+def mask_pred_arr(chunk,chunk_dilate_size,pred_arr):
+
+    # apply the spectral_unmixing as the mask layer, if it exists
+    unmixing_path = f'{PATH_HDF}/{REGION}_Spectral_Unmixing_{YEAR_RANGE}.hdf'
+
+    if os.path.exists(unmixing_path):
+        unmixing_ds = h5py.File(unmixing_path, 'r')
+        unmixing_arr = unmixing_ds[list(unmixing_ds.keys())[0]]
+
+        # mask the pred arr
+        unmixing_mask = unmixing_arr[:,
+                                        chunk[0]:chunk[0] + chunk_dilate_size,
+                                        chunk[1]:chunk[1] + chunk_dilate_size]
+        
+        # apply the mask
+        pred_arr = np.where(unmixing_mask.argmax(axis=0) == UNMIXING_LU_ID[UNMIXING_LU], 
+                            pred_arr, 
+                            0)
+
+        return  pred_arr
+    
+    else:
+        print('No spectral unmixing file found, skip masking...')
+
 
 
 # function to make prediction given a trained model
@@ -223,13 +247,13 @@ def classify_hdf(sample_type,model):
     with h5py.File(f'{TIF_SAVE_PATH}/classification_{REGION}_{sample_type}.hdf', 'w') as f:
 
         # create the dataset
-        dataset = f.create_dataset('classification', 
-                                shape= (1, *hdf_arr_shape[1:]), 
-                                dtype='int8', 
-                                chunks=(1, chunk_dilate_size, chunk_dilate_size),
-                                compression=7,
-                                fillvalue=0)
-
+        f.create_dataset('classification', 
+                         shape= (1, *hdf_arr_shape[1:]), 
+                         dtype='int8', 
+                         chunks=(1, chunk_dilate_size, chunk_dilate_size),
+                         compression=7,
+                         fillvalue=0)
+        
 
     # open all the hdf file
     hdf_arrs = []
@@ -262,6 +286,10 @@ def classify_hdf(sample_type,model):
 
         # reshape pred into (H, W)
         pred = pred.reshape(arr_slice_shape[-2], arr_slice_shape[-1])
+
+        # mask the pred
+        pred = mask_pred_arr(chunk,chunk_dilate_size,pred)
+
 
         # get the row/col index of the 
         if os.path.exists(SUBSET_PATH):
