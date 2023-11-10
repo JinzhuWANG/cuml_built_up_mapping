@@ -12,7 +12,9 @@ import h5py
 from rasterio import Affine
 from sklearn.metrics import classification_report
 from tqdm.auto import tqdm
-from numpy.linalg import lstsq
+# from numpy.linalg import lstsq
+import cupy as cp
+from cupy.linalg import lstsq
 
 
 
@@ -69,7 +71,7 @@ class compute_custom_indices_by_chunk():
                                         dtype=self.dtype,
                                         fillvalue=np.nan, 
                                         compression="gzip", 
-                                        compression_opts=7,
+                                        compression_opts=9,
                                         chunks=(self.bands_count,block_size,block_size))
 
             # loop through each block to compute the indices
@@ -167,6 +169,10 @@ def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
             end_numbers: array with shape (C, N)
     OUTPUT: unmixing_arr: array with shape (N, H, W)
     '''
+    # cpu to GPU
+    arr = cp.asarray(arr)
+    end_numbers = cp.asarray(end_numbers)
+
     # get the shape of the array
     C, H, W = arr.shape
     # get the number of endmembers
@@ -182,6 +188,9 @@ def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
     unmixing_arr_col = np.exp(unmixing_arr_col)/np.sum(np.exp(unmixing_arr_col),axis=0)
     # change the dtype
     unmixing_arr_col = (unmixing_arr_col*127).astype(np.uint8)
+
+    # GPU to CPU
+    unmixing_arr_col = cp.asnumpy(unmixing_arr_col)
 
     return unmixing_arr_col
 
