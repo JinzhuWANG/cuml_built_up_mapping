@@ -4,8 +4,7 @@ from tools.model_pred import get_bands_accuracy, get_models, pred_hdf
 from tools.training_spliting import increase_nonurban_pts, train_test_split_sample
 from tools.dataProcessing import arr_to_TIFF, calculate_overlay_accuracy,\
                                  extract_img_val_to_sample, overlay_classified_tif,\
-                                 get_custom_indices
-
+                                 get_custom_indices, get_spectral_unmixing
 
 
 ############################################
@@ -15,7 +14,6 @@ from tools.dataProcessing import arr_to_TIFF, calculate_overlay_accuracy,\
 # 1) compute the Normalized Index for all the Landsat images
 # NOTE the values are rescaled to -127 ~ 127 as int8
 get_custom_indices()
-
 
 
 
@@ -30,6 +28,8 @@ train_test_split_sample()
 # 3) gradually increse the size of non-urban built points
 increase_nonurban_pts()
 get_bands_accuracy()
+# 4) get the spectral unmixing result
+get_spectral_unmixing()
 
 
 

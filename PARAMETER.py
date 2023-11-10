@@ -6,6 +6,9 @@
 #            Data Preparation              #
 ############################################
 
+# explaination of the Spectral-Unmixing
+# https://www.harrisgeospatial.com/docs/BackgroundSpectralUnmixing.html
+
 # define the expression to calculate the Normalized Index
 INDICES_CAL_EXPRESSION = {
                             'NDWI':{ 'Landsat5':'(Band_4 - Band_2) / (Band_4 + Band_2)',
@@ -41,12 +44,12 @@ REFERENCE_DATA_PATH = f'{BASE_PATH}/reference_data'
 #           REGEION & NAME                 #
 ############################################
 # one of 'xinan,xibei,zhongnan,dongbei,huabei,huadong'
-REGION = 'huadong'                                                     # change this to fit the region
+REGION = 'xinan'                                                     # change this to fit the region
 YEAR_RANGE = '2020_2022'
 
 # the ShpFile to subset the input HDF data,
 # so that we can get partial result fast
-SUBSET = False
+SUBSET = True
 
 
 if SUBSET == True:

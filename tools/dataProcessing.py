@@ -12,7 +12,7 @@ import h5py
 from rasterio import Affine
 from sklearn.metrics import classification_report
 from tqdm.auto import tqdm
-from numpy.linalg import solve
+from numpy.linalg import lstsq
 
 
 
@@ -34,12 +34,14 @@ class compute_custom_indices_by_chunk():
     def __init__(self, img_path:str, 
                  compute_type:str, 
                  dtype:np.dtype=np.int8,
+                 bands_count:int=1,
                  *args,
                  **kwargs):
 
         self.img_path = img_path
         self.compute_type = compute_type
         self.dtype = dtype
+        self.bands_count = bands_count
         self.args = args
         self.kwargs = kwargs
 
@@ -63,12 +65,12 @@ class compute_custom_indices_by_chunk():
             with h5py.File(out_name,mode='w') as hdf_file:
                 # Create a dataset and save the NumPy array to it
                 hdf_file.create_dataset(self.compute_type, 
-                                        shape=(1,ds_shape[1],ds_shape[2]),
+                                        shape=(self.bands_count,ds_shape[1],ds_shape[2]),
                                         dtype=self.dtype,
                                         fillvalue=np.nan, 
                                         compression="gzip", 
                                         compression_opts=9,
-                                        chunks=(1,block_size,block_size))
+                                        chunks=(self.bands_count,block_size,block_size))
 
             # loop through each block to compute the indices
             slice_rows = range(0,ds_shape[1],block_size)
@@ -158,9 +160,7 @@ def get_custom_indices():
             compute_indices_decorated()
 
 
-@compute_custom_indices_by_chunk(img_path=f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf",
-                                compute_type='Spectral_Unmixing',
-                                dtype=np.int8)
+
 def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
     ''' spectral unmixing for the arr
     INPUT:  arr: array with shape (C, H, W)
@@ -170,20 +170,20 @@ def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
     # get the shape of the array
     C, H, W = arr.shape
     # get the number of endmembers
-    N = end_numbers.shape[1] # in_shapge -> (C, N)
+    N = end_numbers.shape[0] # in_shapge -> (N, C)
 
     # reshape the array
     arr = arr.reshape(C,H*W)
-    # solve the linear equation
-    unmixing_arr = solve(end_numbers.T, arr)
-    # apply softmax
-    unmixing_arr = np.exp(unmixing_arr)/np.sum(np.exp(unmixing_arr),axis=0)
-    # reshape the array
-    unmixing_arr = unmixing_arr.reshape(N,H,W)
-    # multiply 127 and convert dtype to int8
-    unmixing_arr = (unmixing_arr*127).astype(np.int8)
 
-    return unmixing_arr
+    # solve the linear equation
+    unmixing_arr_col, residuals, rank, s = lstsq(end_numbers.T, arr)
+    unmixing_arr_col = unmixing_arr_col.reshape(N,H,W)
+    # apply softmax
+    unmixing_arr_col = np.exp(unmixing_arr_col)/np.sum(np.exp(unmixing_arr_col),axis=0)
+    # change the dtype
+    unmixing_arr_col = (unmixing_arr_col*127).astype(np.uint8)
+
+    return unmixing_arr_col
 
     
 
@@ -195,20 +195,24 @@ def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free'):
     if os.path.exists(spectral_unmixing_path):
         print(f'{spectral_unmixing_path} already exists!\n')
     else:
-        # get the endmembers
-        endmembers = np.load(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy')
-        unmixing_sample_colunms = get_bands_index()
-        if not unmixing_from in unmixing_sample_colunms['band_type']:
-            raise ValueError(f'{unmixing_from} should be one of {unmixing_sample_colunms["band_type"].tolist()}!')
+        # get the end_numbers
+        end_numbers = np.load(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy')
 
-        endmembers = endmembers[:,unmixing_sample_colunms.query(f'band_type=="{unmixing_from}"')['indices'].tolist()]
+        # get the index of the bands used for unmixing
+        unmixing_sample_colunms = get_bands_index()
+        if not unmixing_from in unmixing_sample_colunms['band_type'].tolist():
+            raise ValueError(f'{unmixing_from} should be one of {unmixing_sample_colunms["band_type"].tolist()}!')
+        band_idx = unmixing_sample_colunms.query(f'band_type=="{unmixing_from}"')['indices'].tolist()[0]
+
+        end_numbers = end_numbers[:,band_idx]
 
         # compute the spectral unmixing
         spectral_unmixing_decorated = compute_custom_indices_by_chunk(
                                         img_path=f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf",
                                         compute_type='Spectral_Unmixing',
-                                        dtype=np.int8)(partial(spectral_unmixing,
-                                                                end_numbers=endmembers))
+                                        dtype=np.uint8,
+                                        bands_count=end_numbers.shape[0])(partial(spectral_unmixing,
+                                                                end_numbers=end_numbers))
         # invoke the decorated function
         spectral_unmixing_decorated()
 
@@ -233,6 +237,7 @@ def extract_img_val_to_sample(force_resample=False):
 
         for sample_type,path in zip(['sample_classification', 'sample_unmixing'],
                                     [sample_path, unmixing_sample_path]):
+                                    
             # check if the path exists
             if not os.path.exists(path):
                 raise ValueError(f'{path} does not exist!')    
@@ -241,6 +246,8 @@ def extract_img_val_to_sample(force_resample=False):
         
 def img_val_to_point(sample_type,sample_path:str):
     sample_pts = gpd.read_file(sample_path)
+    # explode the sample points
+    sample_pts = sample_pts.explode().reset_index(drop=True)
 
     # get the hdf files
     hdf_files = get_hdf_files()
@@ -257,6 +264,9 @@ def img_val_to_point(sample_type,sample_path:str):
     if sample_type == 'sample_classification':
         np.save(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy',sample_values)
     else:
+        sample_num = sample_values.shape[1]
+        sample_df = pd.concat([sample_pts,pd.DataFrame(sample_values)],1)
+        sample_values = sample_df.groupby(['unmixing_t']).mean()[range(sample_num)].values
         np.save(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy',sample_values)
 
 
