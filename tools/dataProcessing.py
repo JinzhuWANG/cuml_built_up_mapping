@@ -69,7 +69,7 @@ class compute_custom_indices_by_chunk():
                                         dtype=self.dtype,
                                         fillvalue=np.nan, 
                                         compression="gzip", 
-                                        compression_opts=9,
+                                        compression_opts=7,
                                         chunks=(self.bands_count,block_size,block_size))
 
             # loop through each block to compute the indices
