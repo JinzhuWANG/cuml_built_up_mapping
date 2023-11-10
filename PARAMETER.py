@@ -6,8 +6,11 @@
 #            Data Preparation              #
 ############################################
 
-# explaination of the Spectral-Unmixing
-# https://www.harrisgeospatial.com/docs/BackgroundSpectralUnmixing.html
+'''Explaination on the Spectral-Unmixing sample points:
+    1) we collected 3 types of sample points: urban, vegetation, water
+    2) these points are coded as [0,1,2] in the unmixing_t column'''
+
+
 
 # define the expression to calculate the Normalized Index
 INDICES_CAL_EXPRESSION = {
