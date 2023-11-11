@@ -2,7 +2,7 @@
 
 from tools.model_pred import get_bands_accuracy, get_models, pred_hdf
 from tools.training_spliting import increase_nonurban_pts, train_test_split_sample
-from tools.dataProcessing import arr_to_TIFF, calculate_overlay_accuracy,\
+from tools.dataProcessing import classified_HDF_to_TIFF, calculate_overlay_accuracy,\
                                  extract_img_val_to_sample, overlay_classified_tif,\
                                  get_custom_indices, get_spectral_unmixing
 
@@ -56,7 +56,7 @@ trained_models = get_models()
 pred_hdf(trained_models,force_use_nonurban_subset=False)
 
 # save classified hdf to tif
-arr_to_TIFF()
+classified_HDF_to_TIFF()
 
 
 

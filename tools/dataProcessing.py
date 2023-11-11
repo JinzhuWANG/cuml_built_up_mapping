@@ -32,6 +32,17 @@ from tools import get_hdf_files, get_geo_meta, extract_val_to_pt
 from dataprep.dataprep_tools import get_str_info
 
 class compute_custom_indices_by_chunk():
+    """
+    A class used to compute custom indices for a Landsat image in chunks and save them to disk.
+
+    Attributes:
+        img_path (str): Path to the Landsat image file.
+        compute_type (str): Type of index to compute.
+        dtype (np.dtype, optional): Data type of the computed indices. Defaults to np.int8.
+        bands_count (int, optional): Number of bands used for computing the indices. Defaults to 1.
+        args: Additional positional arguments for the computation function.
+        kwargs: Additional keyword arguments for the computation function.
+    """
 
     def __init__(self, img_path:str, 
                  compute_type:str, 
@@ -39,6 +50,17 @@ class compute_custom_indices_by_chunk():
                  bands_count:int=1,
                  *args,
                  **kwargs):
+        """
+        Initializes the class instance with the provided parameters.
+
+        Args:
+            img_path (str): Path to the Landsat image file.
+            compute_type (str): Type of index to compute.
+            dtype (np.dtype, optional): Data type of the computed indices. Defaults to np.int8.
+            bands_count (int, optional): Number of bands used for computing the indices. Defaults to 1.
+            args: Additional positional arguments for the computation function.
+            kwargs: Additional keyword arguments for the computation function.
+        """
 
         self.img_path = img_path
         self.compute_type = compute_type
@@ -49,6 +71,15 @@ class compute_custom_indices_by_chunk():
 
 
     def __call__(self, compute_func:callable,):
+        """
+        Decorator method that wraps the computation function and performs the computation in chunks.
+
+        Args:
+            compute_func (callable): The computation function to be wrapped.
+
+        Returns:
+            callable: The wrapped computation function.
+        """
         def wrapper():
             # get the year of the landsat image
             region,_,year_range = get_str_info(self.img_path)
@@ -134,7 +165,10 @@ def compute_indices(arr_slice, year, index:str):
 
 
 def get_custom_indices():
-    
+    """
+    Computes custom indices for a Landsat image and saves them to disk if they don't already exist.
+    The indices are computed using the INDICES_CAL_EXPRESSION dictionary defined in the module.
+    """
     # loop through each index
     Landsat_img_path = f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf"
     indices = INDICES_CAL_EXPRESSION.keys()
@@ -197,6 +231,15 @@ def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
     
 
 def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free'):
+    """
+    Computes the spectral unmixing for a given Landsat image.
+
+    Args:
+    - unmixing_from (str): The type of bands to use for unmixing. Default is 'Landsat_cloud_free'.
+
+    Returns:
+    - None
+    """
     # check if the spectral unmixing already exist
     year_range = get_str_info(f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf")[-1]
     spectral_unmixing_path = f"{PATH_HDF}/{REGION}_Spectral_Unmixing_{year_range}.hdf"
@@ -280,7 +323,7 @@ def img_val_to_point(sample_type,sample_path:str):
 
 
 
-def arr_to_TIFF():
+def classified_HDF_to_TIFF():
     ''' save the array to tif file
     INPUT:  ds_arr: array with shape (C, H, W)
     OUTPUT: None, but export the tif file to the {TIF_SAVE_PATH}
@@ -289,53 +332,84 @@ def arr_to_TIFF():
 
     # open the HDF file, read the chunks
     hdf_classified_paths =  glob(f'{TIF_SAVE_PATH}/classification_{REGION}_*.hdf')
+    # get the sample_type
+    sample_types = [re.compile(rf'{REGION}_(.*).hdf').findall(path)[0] for path in hdf_classified_paths]
+    # get the names for saving the tif files
+    save_names = [f'classification_{REGION}_{sample_type}.tif' for sample_type in sample_types]
 
-    for path in hdf_classified_paths:
-        # get the sample_type
-        sample_type = re.compile(rf'{REGION}_(.*).hdf').findall(path)[0]
-        print(f'Processing the classified_hdf_{sample_type}...')
-
-        hdf_classified =  h5py.File(path, 'r')
-        hdf_classified_arr = hdf_classified['classification']
-        hdf_chunks = [chunck for chunck in hdf_classified['classification'].iter_chunks()]
-
-
-        # get the geo_transformation
-        tif_meta = get_geo_meta() 
-        tif_meta.update({'count': 1, 
-                        'dtype': 'int8', 
-                        'driver': 'GTiff',
-                        'compress': 'lzw',
-                        'height': hdf_classified_arr.shape[1],
-                        'width': hdf_classified_arr.shape[2]})
-
-        # update the geo_transformation if subset is used
-        if os.path.exists(SUBSET_PATH):
-            # get the xy coordinates of the bounds of the shp
-            bounds = gpd.read_file(SUBSET_PATH).bounds
-            trans = list(tif_meta['transform'])
-            trans[2] = bounds['minx'].values[0]
-            trans[5] = bounds['maxy'].values[0]
-
-            # update the meta
-            tif_meta['transform'] = Affine(*trans)
-        
-
-        # write the array to tif, chunk by chunk
-        with rasterio.open(f'{TIF_SAVE_PATH}/classification_{REGION}_{sample_type}.tif', 
-                        'w',
-                        **tif_meta) as dst:
-            for chunk in tqdm(hdf_chunks):
-                arr = hdf_classified['classification'][chunk].astype(np.int8)
-                dst.write(arr, window=rasterio.windows.Window.from_slices(chunk[1], chunk[2]))
+    for save_name,path in zip(save_names,hdf_classified_paths):
+        print(f'Processing the {save_name}...')
+    
+        HDF_to_TIFF(save_name,path)
 
 
-        # close the hdf file
-        hdf_classified.close()
+def HDF_to_TIFF(save_name:str,
+                path:str,
+                band_count:int=1,
+                dtype=np.int8):
+    """
+    Convert a HDF file to a TIFF file.
+
+    Args:
+        save_name (str): The type of the HDF file.
+        path (str): The path of the HDF file.
+        band_count (int, optional): The number of bands in the HDF file. Default is 1.
+        dtype (numpy.dtype, optional): The data type of the TIFF file. Default is np.int8.
+
+    Returns:
+        None. The function saves the TIFF file in the specified directory.
+    """
+    # add the .tif suffix if it is not in the save_name
+    if not save_name.endswith('.tif'):
+        save_name += '.tif'
+
+    hdf_ds =  h5py.File(path, 'r')
+    hdf_ds_arr = hdf_ds[list(hdf_ds.keys())[0]]
+    hdf_chunks = [chunck for chunck in hdf_ds_arr.iter_chunks()]
+
+    # get the geo_transformation
+    tif_meta = get_geo_meta() 
+    tif_meta.update({'count': band_count, 
+                    'dtype': dtype, 
+                    'driver': 'GTiff',
+                    'compress': 'lzw',
+                    'height': hdf_ds_arr.shape[1],
+                    'width': hdf_ds_arr.shape[2]})
+
+    # update the geo_transformation if subset is used
+    if os.path.exists(SUBSET_PATH):
+        # get the xy coordinates of the bounds of the shp
+        bounds = gpd.read_file(SUBSET_PATH).bounds
+        trans = list(tif_meta['transform'])
+        trans[2] = bounds['minx'].values[0]
+        trans[5] = bounds['maxy'].values[0]
+
+        # update the meta
+        tif_meta['transform'] = Affine(*trans)
+    
+
+    # write the array to tif, chunk by chunk
+    with rasterio.open(f'{TIF_SAVE_PATH}/{save_name}', 
+                    'w',
+                    **tif_meta) as dst:
+        for chunk in tqdm(hdf_chunks):
+            arr = hdf_ds_arr[chunk].astype(np.int8)
+            dst.write(arr, window=rasterio.windows.Window.from_slices(chunk[1], chunk[2]))
+
+    # close the hdf file
+    hdf_ds.close()
+
+
+    
 
 # overlay the classified tif files, get the pixels with value > {OVERLAY_THRESHOLD}
 def overlay_classified_tif():
+    """
+    Overlay multiple classified tif files and filter pixels with value > OVERLAY_THRESHOLD.
 
+    Returns:
+        None
+    """
     # get the number of classification tifs
     num_classified_tifs = len(glob(f'{TIF_SAVE_PATH}/classification_{REGION}_*.tif'))
 
