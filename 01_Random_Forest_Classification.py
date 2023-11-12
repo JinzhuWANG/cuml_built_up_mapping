@@ -14,7 +14,7 @@ from tools.dataProcessing import classified_HDF_to_TIFF, calculate_overlay_accur
 # 1) compute the Normalized Index for all the Landsat images
 # NOTE the values are rescaled to -127 ~ 127 as int8
 
-get_custom_indices(to_tif=False)                 # to_tif=True will save the result to tif in the {root directory}
+get_custom_indices(to_tif=False)                 # to_tif=True will save the result to tif in the {TIF_SAVE_PATH}
 
 
 
@@ -33,7 +33,7 @@ increase_nonurban_pts()
 get_bands_accuracy()
 
 # 5) get the spectral unmixing result
-get_spectral_unmixing(to_tif=True)              # to_tif=True will save the result to tif in the {root directory}
+get_spectral_unmixing(to_tif=True)              # to_tif=True will save the result to tif in the {TIF_SAVE_PATH}
 
 
 
