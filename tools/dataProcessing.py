@@ -164,7 +164,7 @@ def compute_indices(arr_slice, year, index:str):
 
 
 
-def get_custom_indices():
+def get_custom_indices(to_tif:bool=False):
     """
     Computes custom indices for a Landsat image and saves them to disk if they don't already exist.
     The indices are computed using the INDICES_CAL_EXPRESSION dictionary defined in the module.
@@ -195,6 +195,13 @@ def get_custom_indices():
             # Invoke the docorated function
             compute_indices_decorated()
 
+        # convert the hdf to tif
+        if to_tif:
+            save_name=f"{REGION}_{index}_{year_range}.tif"
+            path = f'{PATH_HDF}/{REGION}_{index}_{year_range}.hdf'            
+            HDF_to_TIFF(save_name, path)
+
+
 
 
 def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
@@ -218,8 +225,10 @@ def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
     # solve the linear equation
     unmixing_arr_col, residuals, rank, s = lstsq(end_numbers.T, arr)
     unmixing_arr_col = unmixing_arr_col.reshape(N,H,W)
+
     # apply softmax
     unmixing_arr_col = np.exp(unmixing_arr_col)/np.sum(np.exp(unmixing_arr_col),axis=0)
+
     # change the dtype
     unmixing_arr_col = (unmixing_arr_col*127).astype(np.uint8)
 
@@ -230,7 +239,8 @@ def spectral_unmixing(arr:np.ndarray,end_numbers:np.ndarray):
 
     
 
-def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free'):
+def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free',
+                          to_tif:bool=False):
     """
     Computes the spectral unmixing for a given Landsat image.
 
@@ -243,12 +253,14 @@ def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free'):
     # check if the spectral unmixing already exist
     year_range = get_str_info(f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf")[-1]
     spectral_unmixing_path = f"{PATH_HDF}/{REGION}_Spectral_Unmixing_{year_range}.hdf"
+    # get the end_numbers
+    end_numbers = np.load(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy')
+    
 
     if os.path.exists(spectral_unmixing_path):
         print(f'{spectral_unmixing_path} already exists!\n')
     else:
-        # get the end_numbers
-        end_numbers = np.load(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy')
+        
 
         # get the index of the bands used for unmixing
         unmixing_sample_colunms = get_bands_index()
@@ -267,6 +279,13 @@ def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free'):
                                                                 end_numbers=end_numbers))
         # invoke the decorated function
         spectral_unmixing_decorated()
+
+    # convert the hdf to tif
+    if to_tif:
+        save_name=f"{REGION}_Spectral_Unmixing_{year_range}.tif"
+        path = f'{PATH_HDF}/{REGION}_Spectral_Unmixing_{year_range}.hdf'            
+        HDF_to_TIFF(save_name, 
+                    path)
 
 
 
@@ -337,24 +356,33 @@ def classified_HDF_to_TIFF():
     # get the names for saving the tif files
     save_names = [f'classification_{REGION}_{sample_type}.tif' for sample_type in sample_types]
 
+    # loop through each classified hdf file
     for save_name,path in zip(save_names,hdf_classified_paths):
         print(f'Processing the {save_name}...')
-    
-        HDF_to_TIFF(save_name,path)
+        
+        # update the geo_transformation if subset is used
+        if os.path.exists(SUBSET_PATH):
+            tif_meta = get_geo_meta()
+            # get the xy coordinates of the bounds of the shp
+            bounds = gpd.read_file(SUBSET_PATH).bounds
+            trans = list(tif_meta['transform'])
+            trans[2] = bounds['minx'].values[0]
+            trans[5] = bounds['maxy'].values[0]
+
+        # convert the hdf to tif
+        HDF_to_TIFF(save_name,path,trans)
 
 
 def HDF_to_TIFF(save_name:str,
                 path:str,
-                band_count:int=1,
-                dtype=np.int8):
+                transform:list=None):
     """
     Convert a HDF file to a TIFF file.
 
     Args:
         save_name (str): The type of the HDF file.
         path (str): The path of the HDF file.
-        band_count (int, optional): The number of bands in the HDF file. Default is 1.
-        dtype (numpy.dtype, optional): The data type of the TIFF file. Default is np.int8.
+        transform (list, optional): The geo transformation of the TIFF file. Defaults to None.
 
     Returns:
         None. The function saves the TIFF file in the specified directory.
@@ -367,6 +395,9 @@ def HDF_to_TIFF(save_name:str,
     hdf_ds_arr = hdf_ds[list(hdf_ds.keys())[0]]
     hdf_chunks = [chunck for chunck in hdf_ds_arr.iter_chunks()]
 
+    band_count = hdf_ds_arr.shape[0]
+    dtype = hdf_ds_arr.dtype
+
     # get the geo_transformation
     tif_meta = get_geo_meta() 
     tif_meta.update({'count': band_count, 
@@ -375,25 +406,18 @@ def HDF_to_TIFF(save_name:str,
                     'compress': 'lzw',
                     'height': hdf_ds_arr.shape[1],
                     'width': hdf_ds_arr.shape[2]})
-
-    # update the geo_transformation if subset is used
-    if os.path.exists(SUBSET_PATH):
-        # get the xy coordinates of the bounds of the shp
-        bounds = gpd.read_file(SUBSET_PATH).bounds
-        trans = list(tif_meta['transform'])
-        trans[2] = bounds['minx'].values[0]
-        trans[5] = bounds['maxy'].values[0]
-
-        # update the meta
-        tif_meta['transform'] = Affine(*trans)
     
+    # update the transform if the transform is provided
+    if transform:
+        tif_meta['transform'] = Affine(*transform)
 
     # write the array to tif, chunk by chunk
     with rasterio.open(f'{TIF_SAVE_PATH}/{save_name}', 
                     'w',
+                    BIGTIFF='YES',
                     **tif_meta) as dst:
         for chunk in tqdm(hdf_chunks):
-            arr = hdf_ds_arr[chunk].astype(np.int8)
+            arr = hdf_ds_arr[chunk].astype(dtype)
             dst.write(arr, window=rasterio.windows.Window.from_slices(chunk[1], chunk[2]))
 
     # close the hdf file
