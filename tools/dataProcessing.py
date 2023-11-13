@@ -198,8 +198,13 @@ def get_custom_indices(to_tif:bool=False):
         # convert the hdf to tif
         if to_tif:
             save_name=f"{REGION}_{index}_{year_range}.tif"
-            path = f'{PATH_HDF}/{REGION}_{index}_{year_range}.hdf'            
-            HDF_to_TIFF(save_name, path)
+            path = f'{PATH_HDF}/{REGION}_{index}_{year_range}.hdf'
+
+            if os.path.exists(f'{TIF_SAVE_PATH}/{save_name}'):
+                print(f'{save_name} already exists!\n')
+            else:
+                print(f'Converting {save_name} to tif...')            
+                HDF_to_TIFF(save_name, path)            
 
 
 
@@ -283,9 +288,13 @@ def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free',
     # convert the hdf to tif
     if to_tif:
         save_name=f"{REGION}_Spectral_Unmixing_{year_range}.tif"
-        path = f'{PATH_HDF}/{REGION}_Spectral_Unmixing_{year_range}.hdf'            
-        HDF_to_TIFF(save_name, 
-                    path)
+        path = f'{PATH_HDF}/{REGION}_Spectral_Unmixing_{year_range}.hdf'
+
+        if os.path.exists(f'{TIF_SAVE_PATH}/{save_name}'):
+            print(f'{save_name} already exists!\n')
+        else:
+            print(f'Converting {save_name} to tif...')            
+            HDF_to_TIFF(save_name, path)
 
 
 
@@ -337,7 +346,7 @@ def img_val_to_point(sample_type,sample_path:str):
     else:
         sample_num = sample_values.shape[1]
         sample_df = pd.concat([sample_pts,pd.DataFrame(sample_values)],1)
-        sample_values = sample_df.groupby(['unmixing_t']).mean()[range(sample_num)].values
+        sample_values = sample_df.groupby(['lucc']).mean()[range(sample_num)].values
         np.save(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy',sample_values)
 
 

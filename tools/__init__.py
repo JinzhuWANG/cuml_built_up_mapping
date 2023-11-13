@@ -20,7 +20,7 @@ def get_hdf_files():
     hdf_files = [i for i in hdf_files if (('terrain' in i)|(YEAR_RANGE in i))]
     
     # spectral unmixing hdf files are not used for classification
-    hdf_files = [i for i in hdf_files if 'Spectral_unmixing' not in i]
+    hdf_files = [i for i in hdf_files if 'Spectral_Unmixing' not in i]
 
     if len(hdf_files) == 0:
         raise ValueError(f'No hdf file of {REGION} found in {PATH_HDF}!')

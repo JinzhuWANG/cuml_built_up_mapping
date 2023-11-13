@@ -6,7 +6,7 @@
 #            Data Preparation              #
 ############################################
 
-# the unmixing dictionary between lucc and its id,
+# the unmixing dictionary between lucc and its code,
 # here we use 'bare' to mask the prediction, meaning
 # that only if a pixel has the highest probability of being
 # bare land (among ['bare','vegetation', 'water']), then 
