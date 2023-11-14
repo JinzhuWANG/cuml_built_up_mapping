@@ -258,15 +258,20 @@ def get_spectral_unmixing(unmixing_from:str='Landsat_cloud_free',
     # check if the spectral unmixing already exist
     year_range = get_str_info(f"{PATH_HDF}/{REGION}_Landsat_cloud_free_{YEAR_RANGE}.hdf")[-1]
     spectral_unmixing_path = f"{PATH_HDF}/{REGION}_Spectral_Unmixing_{year_range}.hdf"
+
     # get the end_numbers
-    end_numbers = np.load(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy')
-    
+    end_number_path = f'{SAMPLE_PTS_PATH}/sample_values_{REGION}_unmixing.npy'
+    if not os.path.exists(end_number_path):
+        print(f'\n{end_number_path} \ndoes not exist!\nSkip spectral unmixing!\n')
+        return None
+    else:
+        end_numbers = np.load(end_number_path)
+
 
     if os.path.exists(spectral_unmixing_path):
         print(f'{spectral_unmixing_path} already exists!\n')
-    else:
-        
 
+    else:
         # get the index of the bands used for unmixing
         unmixing_sample_colunms = get_bands_index()
         if not unmixing_from in unmixing_sample_colunms['band_type'].tolist():
@@ -320,9 +325,11 @@ def extract_img_val_to_sample(force_resample=False):
                                     
             # check if the path exists
             if not os.path.exists(path):
-                raise ValueError(f'{path} does not exist!')    
-            # extract the image values to sample points
-            img_val_to_point(sample_type,path)
+                print(f'{path} does not exist! Skip sample extraction for spectral unmixing!\n')
+            else:
+                print(f'Extracting image values to {sample_type}...\n')
+                # extract the image values to sample points
+                img_val_to_point(sample_type,path)
         
 def img_val_to_point(sample_type,sample_path:str):
     sample_pts = gpd.read_file(sample_path)

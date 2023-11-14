@@ -26,6 +26,9 @@ get_custom_indices(to_tif=False)
 
 # 1) extract image values to sample points
 extract_img_val_to_sample(force_resample=True)
+
+# use UMAP to reduce the dimension of the sample points
+# and then plot the sample points
 plot_sample_pts()
 
 # 2) split sample into train and test subset
@@ -38,7 +41,7 @@ get_bands_accuracy()
 
 # 5) get the spectral unmixing result
 # !!! to_tif=True will save the result to tif in the {TIF_SAVE_PATH}
-get_spectral_unmixing(to_tif=True)              
+get_spectral_unmixing(to_tif=True)  
 
 
 
