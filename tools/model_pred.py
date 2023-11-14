@@ -1,4 +1,5 @@
 import os
+import shutil
 import h5py
 from itertools import product
 from tqdm.auto import tqdm
@@ -209,26 +210,53 @@ def pred_hdf(models, force_use_nonurban_subset=False):
             print(f'Classification using the model trained with {sample_type} non-urban subset...')
             classify_hdf(sample_type, model)
             
-def mask_pred_arr(chunk,chunk_dilate_size,pred_arr):
+def mask_classification_arr():
 
     # apply the spectral_unmixing as the mask layer, if it exists
     unmixing_path = f'{PATH_HDF}/{REGION}_Spectral_Unmixing_{YEAR_RANGE}.hdf'
 
     if os.path.exists(unmixing_path):
+
+        # get the array sizes and chunks
+        hdf_arr_shape, chunk_dilate_size, chunks = get_hdf_chunks(unmixing_path)
+
         unmixing_ds = h5py.File(unmixing_path, 'r')
         unmixing_arr = unmixing_ds[list(unmixing_ds.keys())[0]]
 
-        # mask the pred arr
-        unmixing_mask = unmixing_arr[:,
-                                        chunk[0]:chunk[0] + chunk_dilate_size,
-                                        chunk[1]:chunk[1] + chunk_dilate_size]
-        
-        # apply the mask
-        pred_arr = np.where(unmixing_mask.argmax(axis=0) == UNMIXING_LU_ID[UNMIXING_LU], 
-                            pred_arr, 
-                            0)
+        # copy the classified hdf, and then write to it
+        classfied_hdfs = glob(f'{TIF_SAVE_PATH}/classification_{REGION}_*.hdf')
 
-        return  pred_arr
+        for src in classfied_hdfs:
+            dst = src.replace('.hdf', '_masked.hdf')
+            shutil.copyfile(src, dst)
+
+        # open the masked hdf
+        classified_ds = [h5py.File(f,'r+') for f in glob(f'{TIF_SAVE_PATH}/classification_{REGION}_*_masked.hdf')]
+        classified_arrs = [ds[list(ds.keys())[0]] for ds in classified_ds]
+
+        for chunk in tqdm(chunks):
+
+            # mask the pred arr
+            unmixing_mask = unmixing_arr[:,
+                                            chunk[0]:chunk[0] + chunk_dilate_size,
+                                            chunk[1]:chunk[1] + chunk_dilate_size]
+            # write the masked pred to the hdf
+            for classified_arr in classified_arrs:
+
+                # 1) read the pred array
+                pred_arr_chunk = classified_arr[:,
+                                            chunk[0]:chunk[0] + chunk_dilate_size,
+                                            chunk[1]:chunk[1] + chunk_dilate_size]
+                        
+                # 2) mask the pred array
+                pred_arr_chunk = np.where(unmixing_mask.argmax(axis=0) == UNMIXING_LU_ID[UNMIXING_LU], 
+                                    pred_arr_chunk, 
+                                    0)
+                
+                # 3) write the masked pred array to the hdf
+                classified_arr[:,
+                                chunk[0]:chunk[0] + chunk_dilate_size,
+                                chunk[1]:chunk[1] + chunk_dilate_size] = pred_arr_chunk
     
     else:
         print('No spectral unmixing file found, skip masking...')
@@ -287,8 +315,6 @@ def classify_hdf(sample_type,model):
         # reshape pred into (H, W)
         pred = pred.reshape(arr_slice_shape[-2], arr_slice_shape[-1])
 
-        # mask the pred
-        pred = mask_pred_arr(chunk,chunk_dilate_size,pred)
 
 
         # get the row/col index of the 

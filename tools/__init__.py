@@ -1,14 +1,52 @@
+import os
 import h5py
+
+import numpy as np
+
+import umap
+import umap.plot
+from umap import UMAP
+from matplotlib import pyplot as plt
+
 import numpy as np
 import pandas as pd
 import rasterio
+
 from tqdm.auto import tqdm
 from glob import glob
 
+# set up working directory
+
+if __name__ == '__main__':
+    os.chdir('..')
 
 # import parameters
-from PARAMETER import PATH_HDF, TIF_SAVE_PATH, \
+from PARAMETER import PATH_HDF, SAMPLE_PTS_PATH, TIF_SAVE_PATH, \
                       GEO_META_PATH, REGION, YEAR_RANGE
+
+# function to plot the smaple points in a 2d space using TSEN
+def plot_sample_pts():
+    ''' plot the smaple points in a 2d space using TSEN
+    INPUT:  None
+    OUTPUT: None, but save the plot to {TIF_SAVE_PATH}
+    '''
+    # get the sample points
+    sample_pts = np.load(f'{SAMPLE_PTS_PATH}/sample_values_{REGION}.npy', allow_pickle=True)
+    sample_X, sample_y = sample_pts[:,:-1], sample_pts[:,-1]
+
+    # plot the sample points
+    X_embedded = UMAP(n_components=2, init='random')\
+                    .fit_transform(sample_X)
+    # plot the sample points
+    plt.figure(figsize=(10,10))
+    plt.scatter(X_embedded[:,0], 
+                X_embedded[:,1], 
+                color=['red' if i==1 else 'blue' for i in sample_y],
+                alpha=0.5,
+                s=0.5)
+    plt.colorbar()
+    plt.title(f'Sample points of {REGION}')
+
 
 # get hdf input files
 def get_hdf_files():

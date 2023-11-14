@@ -1,6 +1,7 @@
 
 
-from tools.model_pred import get_bands_accuracy, get_models, pred_hdf
+from tools import plot_sample_pts
+from tools.model_pred import get_bands_accuracy, get_models, mask_classification_arr, pred_hdf
 from tools.training_spliting import increase_nonurban_pts, train_test_split_sample
 from tools.dataProcessing import classified_HDF_to_TIFF, calculate_overlay_accuracy,\
                                  extract_img_val_to_sample, overlay_classified_tif,\
@@ -25,6 +26,8 @@ get_custom_indices(to_tif=False)
 
 # 1) extract image values to sample points
 extract_img_val_to_sample(force_resample=True)
+plot_sample_pts()
+
 # 2) split sample into train and test subset
 train_test_split_sample()
 # 3) gradually increse the size of non-urban built points
@@ -34,7 +37,6 @@ increase_nonurban_pts()
 get_bands_accuracy()
 
 # 5) get the spectral unmixing result
-
 # !!! to_tif=True will save the result to tif in the {TIF_SAVE_PATH}
 get_spectral_unmixing(to_tif=True)              
 
@@ -61,6 +63,7 @@ trained_models = get_models()
 
 # apply the model to the hdf files, and then save the prediction to a hdf
 pred_hdf(trained_models,force_use_nonurban_subset=False)
+mask_classification_arr()
 
 # save classified hdf to tif
 classified_HDF_to_TIFF()

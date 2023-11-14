@@ -55,11 +55,13 @@ REFERENCE_DATA_PATH = f'{BASE_PATH}/reference_data'
 
 
 
+
+
 ############################################
 #           REGEION & NAME                 #
 ############################################
 # one of 'xinan,xibei,zhongnan,dongbei,huabei,huadong'
-REGION = 'xinan'                                                     # change this to fit the region
+REGION = 'zhongnan'                                                     # change this to fit the region
 YEAR_RANGE = '2020_2022'
 
 # the ShpFile to subset the input HDF data,
@@ -71,6 +73,9 @@ if SUBSET == True:
     SUBSET_PATH = f'{BASE_PATH}/subset_SHP/subset_shp_{REGION}.shp'        
 else:
     SUBSET_PATH = 'None'    
+
+
+
 
 
 

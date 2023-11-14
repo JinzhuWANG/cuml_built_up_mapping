@@ -389,7 +389,7 @@ def HDF_to_TIFF(save_name:str,
     Convert a HDF file to a TIFF file.
 
     Args:
-        save_name (str): The type of the HDF file.
+        save_name (str): The name for the saved TIF file.
         path (str): The path of the HDF file.
         transform (list, optional): The geo transformation of the TIFF file. Defaults to None.
 
