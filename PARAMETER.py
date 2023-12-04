@@ -43,7 +43,7 @@ TIF_PATH = '/mnt/d/TIF'
 ############################################
 
 # Note the backslash, !!!DO NOT use windows style path
-BASE_PATH = '/mnt/e'                                                   # change this to the base folder 
+BASE_PATH = '/mnt/d/China_Built_up_land_mapping'                       # change this to the base folder 
 
 PATH_HDF = f'{BASE_PATH}/HDF'
 TIF_SAVE_PATH = f'{BASE_PATH}/classification'
@@ -61,7 +61,7 @@ REFERENCE_DATA_PATH = f'{BASE_PATH}/reference_data'
 #           REGEION & NAME                 #
 ############################################
 # one of 'xinan,xibei,zhongnan,dongbei,huabei,huadong'
-REGION = 'zhongnan'                                                     # change this to fit the region
+REGION = 'xibei'                                                     # change this to fit the region
 YEAR_RANGE = '2020_2022'
 
 # the ShpFile to subset the input HDF data,

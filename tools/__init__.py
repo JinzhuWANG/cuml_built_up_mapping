@@ -83,8 +83,18 @@ def extract_val_to_pt(sample_pts,f):
 
     # get the sample values
     sample_values = []
+    out_range_num = 0
     for row,col in tqdm(sample_pts[['row','col']].values):
-        sample_values.append(ds_arr[:,row,col])
+        # use try except to avoid the error when the row/col is out of range
+        try:
+            sample_values.append(ds_arr[:,row,col])
+        except:
+            sample_values.append(np.zeros(ds_arr.shape[0]))
+            out_range_num += 1
+
+    # report the number of out of range points
+    if out_range_num > 0:
+        print(f'{out_range_num} points are out of range!')
     
     # close the dataset
     ds.close()
